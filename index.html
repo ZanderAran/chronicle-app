@@ -1,0 +1,2464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Chronicle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0e0f11;
+    --surface: #16181c;
+    --surface2: #1e2026;
+    --border: #2a2d35;
+    --text: #e8eaf0;
+    --text-dim: #6b7280;
+    --text-muted: #3d424f;
+    --accent: #5b8af5;
+    --accent-dim: #1e2d4a;
+    --green: #3ecf8e;
+    --green-dim: #0d2e1f;
+    --amber: #f59e0b;
+    --amber-dim: #2a1f08;
+    --red: #ef4444;
+    --red-dim: #2a0f0f;
+    --mono: 'DM Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-top: env(safe-area-inset-top, 0px);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── AUTH SCREEN ── */
+  #auth-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100dvh;
+    gap: 2rem;
+    padding: 2rem;
+    background: var(--bg);
+  }
+  .auth-logo {
+    font-family: var(--mono);
+    font-size: 2.5rem;
+    font-weight: 500;
+    letter-spacing: -0.05em;
+    color: var(--text);
+  }
+  .auth-logo span { color: var(--accent); }
+  .auth-sub {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.6;
+    max-width: 280px;
+  }
+  .setup-panel {
+    width: 100%;
+    max-width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .setup-label {
+    font-size: 0.75rem;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: -0.25rem;
+  }
+  .setup-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    width: 100%;
+    outline: none;
+  }
+  .setup-input:focus { border-color: var(--accent); }
+  .setup-input::placeholder { color: var(--text-muted); }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0.85rem 1.5rem;
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.15s;
+  }
+  .btn-primary:active { opacity: 0.8; }
+  .auth-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  /* ── MAIN APP ── */
+  #app { display: none; flex-direction: column; height: 100dvh; }
+  #app.visible { display: flex; }
+
+  /* ── ACTIVE TIMERS PANEL ── */
+  #active-panel {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding-top: calc(var(--safe-top) + 0.5rem);
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    max-height: 0;
+  }
+  #active-panel.has-timers { max-height: 320px; }
+
+  .active-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem 0.5rem;
+  }
+  .active-label {
+    font-size: 0.7rem;
+    font-family: var(--mono);
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .pulse-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  #active-timers-list {
+    padding: 0 0.75rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+
+  .active-timer-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--green-dim);
+    border: 1px solid rgba(62, 207, 142, 0.2);
+    border-radius: 10px;
+    padding: 0.5rem 0.75rem;
+    gap: 0.75rem;
+  }
+  .atc-left { flex: 1; min-width: 0; }
+  .atc-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .atc-meta {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+  .atc-time {
+    font-family: var(--mono);
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--green);
+    white-space: nowrap;
+  }
+  .atc-stop {
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: var(--sans);
+  }
+  .atc-stop:active { opacity: 0.7; }
+
+  /* ── MAIN CONTENT ── */
+  #main-content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0;
+  }
+
+  /* ── VIEWS ── */
+  .view { display: none; padding: 1rem; min-height: 100%; }
+  .view.active { display: block; }
+
+  /* ── PAGE HEADER ── */
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .page-title {
+    font-family: var(--mono);
+    font-size: 1.35rem;
+    font-weight: 500;
+    letter-spacing: -0.03em;
+  }
+  .btn-icon {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: border-color 0.15s;
+  }
+  .btn-icon:active { background: var(--surface); }
+
+  /* ── TOGGLE TABS ── */
+  .toggle-tabs {
+    display: flex;
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 1.25rem;
+    border: 1px solid var(--border);
+  }
+  .toggle-tab {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: var(--text-dim);
+    user-select: none;
+  }
+  .toggle-tab.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  /* ── SECTION LABEL ── */
+  .section-label {
+    font-size: 0.7rem;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.6rem;
+    margin-top: 1rem;
+  }
+  .section-label:first-of-type { margin-top: 0; }
+
+  /* ── CHECKLIST ITEMS ── */
+  .checklist-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+  .checklist-item:active { background: var(--surface2); }
+  .checklist-item.in-progress {
+    border-color: rgba(62,207,142,0.4);
+    background: var(--green-dim);
+  }
+  .checklist-item.done {
+    border-color: var(--text-muted);
+    opacity: 0.5;
+  }
+  .item-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+    background: var(--surface2);
+  }
+  .checklist-item.in-progress .item-icon { background: rgba(62,207,142,0.15); }
+  .item-body { flex: 1; min-width: 0; }
+  .item-title {
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-bottom: 0.2rem;
+  }
+  .item-tags {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .item-status {
+    font-size: 0.7rem;
+    font-family: var(--mono);
+    color: var(--green);
+    white-space: nowrap;
+  }
+  .item-chevron { color: var(--text-muted); font-size: 0.8rem; }
+
+  /* ── TIMER LOG ITEMS ── */
+  .timer-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .tc-header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .tc-title { font-size: 0.95rem; font-weight: 500; }
+  .tc-duration {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+  }
+  .tc-meta {
+    margin-top: 0.35rem;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+  .tc-tags { margin-top: 0.4rem; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .tag-chip {
+    font-size: 0.68rem;
+    font-family: var(--mono);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    color: var(--text-dim);
+  }
+
+  /* ── BOTTOM NAV ── */
+  #bottom-nav {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding-bottom: var(--safe-bottom);
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 0.6rem 0.5rem;
+    cursor: pointer;
+    gap: 0.2rem;
+    transition: color 0.15s;
+    color: var(--text-muted);
+    user-select: none;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-icon { font-size: 1.2rem; }
+  .nav-label { font-size: 0.65rem; font-weight: 500; letter-spacing: 0.02em; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: flex-end;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    border-top: 1px solid var(--border);
+    padding: 1.25rem 1.25rem calc(1.25rem + var(--safe-bottom));
+    width: 100%;
+    max-height: 90dvh;
+    overflow-y: auto;
+    animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .modal-handle {
+    width: 36px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 0 auto 1.25rem;
+  }
+  .modal-title {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 1.25rem;
+  }
+  .form-group { margin-bottom: 1rem; }
+  .form-label {
+    font-size: 0.72rem;
+    font-family: var(--mono);
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+  .form-input, .form-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    width: 100%;
+    outline: none;
+    appearance: none;
+  }
+  .form-input:focus, .form-select:focus { border-color: var(--accent); }
+  .form-input::placeholder { color: var(--text-muted); }
+  .form-row { display: flex; gap: 0.75rem; }
+  .form-row .form-group { flex: 1; }
+  .form-actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+  .btn-secondary {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 10px;
+    padding: 0.85rem;
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .btn-secondary:active { opacity: 0.7; }
+  .form-actions .btn-primary { flex: 2; }
+
+  /* ── WEEK DAYS PICKER ── */
+  .days-picker { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .day-btn {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    font-family: var(--sans);
+  }
+  .day-btn.selected { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: var(--text-muted);
+  }
+  .empty-state .big-icon { font-size: 2.5rem; margin-bottom: 0.75rem; opacity: 0.5; }
+  .empty-state p { font-size: 0.85rem; line-height: 1.6; }
+
+  /* ── LOADING ── */
+  .loading-bar {
+    height: 2px;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s;
+    position: fixed;
+    top: 0; left: 0;
+    z-index: 200;
+  }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: calc(70px + var(--safe-bottom) + 1rem);
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.85rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 20px;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 300;
+    font-family: var(--sans);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── HISTORY FILTER ── */
+  .filter-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
+  .filter-chip {
+    font-size: 0.75rem;
+    font-family: var(--mono);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: 20px;
+    padding: 0.3rem 0.75rem;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* ── MANUAL TIMER VIEW ── */
+  .start-timer-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 1rem;
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 0.5rem;
+    transition: opacity 0.15s;
+  }
+  .start-timer-btn:active { opacity: 0.8; }
+
+  /* ── COMBOBOX ── */
+  .combobox-wrap { position: relative; }
+  .combobox-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 2.2rem 0.75rem 1rem;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    width: 100%;
+    outline: none;
+  }
+  .combobox-input:focus { border-color: var(--accent); }
+  .combobox-input::placeholder { color: var(--text-muted); }
+  .combobox-arrow {
+    position: absolute; right: 0.75rem; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim); font-size: 0.7rem; pointer-events: none;
+  }
+  .combobox-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; z-index: 50; max-height: 180px; overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    display: none;
+  }
+  .combobox-dropdown.open { display: block; }
+  .combobox-option {
+    padding: 0.65rem 1rem; font-size: 0.88rem; cursor: pointer;
+    color: var(--text); transition: background 0.1s;
+  }
+  .combobox-option:hover, .combobox-option:active { background: var(--surface); }
+  .combobox-option.add-new { color: var(--accent); font-style: italic; }
+
+  /* ── HISTORY VIEW TOGGLE ── */
+  .history-view-toggle {
+    display: flex; gap: 0.4rem; margin-bottom: 1rem;
+  }
+  .hv-btn {
+    flex: 1; padding: 0.45rem; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text-dim); font-size: 0.8rem; font-weight: 500;
+    cursor: pointer; transition: all 0.15s; font-family: var(--sans);
+  }
+  .hv-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* ── CHART CONTAINER ── */
+  .chart-section { display: none; }
+  .chart-section.visible { display: block; }
+  .chart-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 1rem; margin-bottom: 0;
+  }
+  .chart-title {
+    font-size: 0.72rem; font-family: var(--mono); color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem;
+  }
+  .chart-range {
+    display: flex; gap: 0.35rem; margin-bottom: 1rem; flex-wrap: wrap;
+  }
+  .range-btn {
+    font-size: 0.72rem; font-family: var(--mono);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); border-radius: 6px;
+    padding: 0.25rem 0.6rem; cursor: pointer; transition: all 0.15s;
+  }
+  .range-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* ── RESPONSIVE CHART GRID ── */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  @media (min-width: 700px) {
+    .charts-grid { grid-template-columns: 1fr 1fr; }
+    .chart-wide { grid-column: 1 / -1; }
+    .charts-grid .chart-wrap canvas { max-height: 260px; }
+  }
+
+  /* ── STACKED CHECKLIST SECTIONS ── */
+  .checklist-section { margin-bottom: 1.5rem; }
+  .checklist-section-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem;
+  }
+  .checklist-section-title {
+    font-size: 0.7rem; font-family: var(--mono); color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+  .checklist-section-title.running { color: var(--green); }
+  .checklist-section-title.daily { color: var(--accent); }
+  .checklist-section-title.weekly { color: var(--amber); }
+  .section-add-btn {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 1.1rem; cursor: pointer; padding: 0; line-height: 1;
+    transition: color 0.15s;
+  }
+  .section-add-btn:active { color: var(--text); }
+
+  /* ── DAY BREAKDOWN ── */
+  .day-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 0.75rem; gap: 0.75rem;
+  }
+  .day-nav-label {
+    font-family: var(--mono); font-size: 1rem; font-weight: 500;
+    text-align: center; flex: 1;
+  }
+  .day-range-row { display: flex; gap: 0.4rem; margin-bottom: 1rem; }
+  .timeline-day { margin-bottom: 1.5rem; }
+  .timeline-day-header {
+    font-size: 0.72rem; font-family: var(--mono); color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 0.5rem; padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between;
+  }
+  .timeline-day-total { color: var(--accent); }
+  .timeline-entry {
+    display: flex; align-items: stretch; gap: 0.75rem;
+    margin-bottom: 0.5rem; position: relative;
+  }
+  .timeline-time-col {
+    display: flex; flex-direction: column; align-items: flex-end;
+    min-width: 48px; flex-shrink: 0;
+  }
+  .timeline-time {
+    font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim);
+    line-height: 1; padding-top: 4px;
+  }
+  .timeline-line {
+    width: 2px; background: var(--border); flex-shrink: 0;
+    border-radius: 1px; position: relative;
+  }
+  .timeline-line::before {
+    content: ''; position: absolute; top: 6px; left: -3px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent); border: 2px solid var(--bg);
+  }
+  .timeline-card {
+    flex: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.55rem 0.85rem;
+  }
+  .timeline-card-title { font-size: 0.88rem; font-weight: 500; margin-bottom: 0.2rem; }
+  .timeline-card-meta {
+    font-size: 0.7rem; color: var(--text-dim); font-family: var(--mono);
+    display: flex; gap: 0.75rem; flex-wrap: wrap;
+  }
+  .timeline-card-dur { color: var(--accent); font-weight: 500; }
+  .day-empty { text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem; }
+  .day-summary-bar { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .day-summary-chip {
+    font-size: 0.72rem; font-family: var(--mono); background: var(--surface);
+    border: 1px solid var(--border); border-radius: 6px; padding: 0.3rem 0.6rem; color: var(--text-dim);
+  }
+  .day-summary-chip span { color: var(--text); }
+
+  /* ── DELETE BUTTON ON HISTORY CARDS ── */
+  .tc-delete {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 1rem; cursor: pointer; padding: 0.2rem 0.3rem;
+    line-height: 1; transition: color 0.15s; flex-shrink: 0;
+  }
+  .tc-delete:active { color: var(--red); }
+
+  /* ── DEVICE SELECTOR IN TIMER START ── */
+  .device-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+  .device-chip {
+    font-size: 0.8rem; font-family: var(--mono);
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text-dim); border-radius: 8px;
+    padding: 0.35rem 0.75rem; cursor: pointer; transition: all 0.15s;
+  }
+  .device-chip.selected { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  /* ── ITEM TYPE TOGGLE ── */
+  .toggle-type-btn {
+    flex: 1; text-align: center; padding: 0.5rem 0.25rem;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-dim);
+    font-size: 0.78rem; font-weight: 500; cursor: pointer;
+    transition: all 0.15s; user-select: none;
+  }
+  .toggle-type-btn.active {
+    background: var(--accent-dim); border-color: var(--accent); color: var(--accent);
+  }
+
+  /* ── GOAL PROGRESS ── */
+  .goal-progress-wrap {
+    margin-top: 0.35rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .goal-bar-track {
+    flex: 1; height: 4px; background: var(--surface2);
+    border-radius: 2px; overflow: hidden;
+  }
+  .goal-bar-fill {
+    height: 100%; border-radius: 2px;
+    background: var(--accent); transition: width 0.3s;
+  }
+  .goal-bar-fill.met { background: var(--green); }
+  .goal-pct {
+    font-size: 0.68rem; font-family: var(--mono);
+    color: var(--text-dim); white-space: nowrap; min-width: 30px; text-align: right;
+  }
+  .goal-pct.met { color: var(--green); }
+
+  /* ── PRESETS GRID ── */
+  .presets-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+  .preset-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 0.85rem 0.9rem;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    position: relative; display: flex; flex-direction: column; gap: 0.3rem;
+  }
+  .preset-card:active { background: var(--surface2); }
+  .preset-card.running { border-color: rgba(62,207,142,0.4); background: var(--green-dim); }
+  .preset-card-emoji { font-size: 1.3rem; line-height: 1; }
+  .preset-card-title { font-size: 0.88rem; font-weight: 500; }
+  .preset-card-meta { font-size: 0.7rem; color: var(--text-dim); font-family: var(--mono); }
+  .preset-card-elapsed { font-size: 0.75rem; font-family: var(--mono); color: var(--green); font-weight: 500; }
+  .preset-card-delete {
+    position: absolute; top: 0.4rem; right: 0.5rem;
+    background: none; border: none; color: var(--text-muted);
+    font-size: 0.75rem; cursor: pointer; padding: 0.1rem 0.2rem;
+    opacity: 0; transition: opacity 0.15s; line-height: 1;
+  }
+  .preset-card:hover .preset-card-delete { opacity: 1; }
+  .preset-card-delete:active { color: var(--red); }
+  .presets-empty { font-size: 0.82rem; color: var(--text-muted); padding: 0.25rem 0; }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+    margin-bottom: 0.5rem;
+  }
+  .settings-row-label { font-size: 0.9rem; font-weight: 500; }
+  .settings-row-sub { font-size: 0.75rem; color: var(--text-dim); font-family: var(--mono); margin-top: 0.15rem; }
+  .settings-row-right { font-size: 0.8rem; color: var(--text-dim); font-family: var(--mono); }
+  .btn-danger {
+    background: var(--red-dim);
+    border: 1px solid rgba(239,68,68,0.3);
+    color: var(--red);
+    border-radius: 10px;
+    padding: 0.75rem;
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-bar" id="loading-bar"></div>
+<div id="toast"></div>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <div>
+    <div class="auth-logo">chron<span>.</span>icle</div>
+  </div>
+  <p class="auth-sub">A timer & task tracker that syncs across all your devices via Google Sheets.</p>
+  <div class="setup-panel">
+    <div class="setup-label">Step 1 — Your Google Sheet ID</div>
+    <input class="setup-input" id="cfg-sheet-id" placeholder="Paste Sheet ID here" type="text">
+    <div class="setup-label">Step 2 — Device Name</div>
+    <input class="setup-input" id="cfg-device" placeholder="e.g. iPhone, MacBook" type="text">
+    <div class="setup-label">Step 3 — Sign in with Google</div>
+    <div id="google-signin-btn" style="display:flex;justify-content:center;"></div>
+    <p class="auth-note" id="auth-status">Sign in with Google to authorize access to your sheet.</p>
+    <button class="btn-secondary" onclick="showSetupGuide()" style="margin-top:0">📋 Setup Guide</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <!-- Active Timers Panel -->
+  <div id="active-panel">
+    <div class="active-panel-header">
+      <div class="active-label">
+        <div class="pulse-dot"></div>
+        <span id="active-count">0 running</span>
+      </div>
+    </div>
+    <div id="active-timers-list"></div>
+  </div>
+
+  <!-- Main Content -->
+  <div id="main-content">
+
+    <!-- CHECKLIST VIEW -->
+    <div class="view active" id="view-checklist">
+      <div class="page-header">
+        <div class="page-title">Checklist</div>
+        <button class="btn-icon" onclick="openAddChecklistModal()">＋</button>
+      </div>
+      <div id="checklist-list"></div>
+    </div>
+
+    <!-- TIMER VIEW (manual) -->
+    <div class="view" id="view-timer">
+      <div class="page-header">
+        <div class="page-title">New Timer</div>
+      </div>
+
+      <!-- PRESETS -->
+      <div id="presets-section">
+        <div class="checklist-section-header" style="margin-bottom:0.6rem">
+          <div class="checklist-section-title daily">Quick Start</div>
+          <button class="section-add-btn" onclick="openAddPresetModal()">＋</button>
+        </div>
+        <div id="presets-list"></div>
+        <div style="margin-bottom:1.25rem"></div>
+      </div>
+
+      <!-- DIVIDER -->
+      <div class="checklist-section-header" style="margin-bottom:0.75rem">
+        <div class="checklist-section-title" style="color:var(--text-muted)">Custom Timer</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Title</label>
+        <input class="form-input" id="t-title" placeholder="What are you working on?">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <div class="combobox-wrap">
+            <input class="combobox-input" id="t-category" placeholder="Work" autocomplete="off" oninput="filterCombo('t-category','t-cat-drop')" onfocus="openCombo('t-cat-drop')" onblur="closeComboDelayed('t-cat-drop')">
+            <span class="combobox-arrow">▾</span>
+            <div class="combobox-dropdown" id="t-cat-drop"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location</label>
+          <div class="combobox-wrap">
+            <input class="combobox-input" id="t-location" placeholder="Office" autocomplete="off" oninput="filterCombo('t-location','t-loc-drop')" onfocus="openCombo('t-loc-drop')" onblur="closeComboDelayed('t-loc-drop')">
+            <span class="combobox-arrow">▾</span>
+            <div class="combobox-dropdown" id="t-loc-drop"></div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tags</label>
+        <div class="combobox-wrap">
+          <input class="combobox-input" id="t-tags" placeholder="focus, deep-work, client" autocomplete="off" oninput="filterCombo('t-tags','t-tag-drop')" onfocus="openCombo('t-tag-drop')" onblur="closeComboDelayed('t-tag-drop')">
+          <span class="combobox-arrow">▾</span>
+          <div class="combobox-dropdown" id="t-tag-drop"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Device</label>
+        <div class="device-chips" id="t-device-chips"></div>
+      </div>
+      <button class="start-timer-btn" onclick="startManualTimer()">▶ Start Timer</button>
+    </div>
+
+    <!-- HISTORY VIEW -->
+    <div class="view" id="view-history">
+      <div class="page-header">
+        <div class="page-title">History</div>
+        <button class="btn-icon" onclick="loadHistory()">↻</button>
+      </div>
+      <div class="history-view-toggle">
+        <button class="hv-btn active" onclick="switchHistoryView('list', this)">📋 Log</button>
+        <button class="hv-btn" onclick="switchHistoryView('graph', this)">📊 Charts</button>
+        <button class="hv-btn" onclick="switchHistoryView('day', this)">🕐 Day</button>
+      </div>
+
+      <!-- LIST VIEW -->
+      <div id="history-list-section">
+        <div class="filter-row" id="history-filters"></div>
+        <div id="history-list"></div>
+      </div>
+
+      <!-- GRAPH VIEW -->
+      <div class="chart-section" id="history-graph-section">
+        <div class="chart-range" id="chart-range">
+          <button class="range-btn active" onclick="setChartRange(7, this)">7d</button>
+          <button class="range-btn" onclick="setChartRange(30, this)">30d</button>
+          <button class="range-btn" onclick="setChartRange(90, this)">90d</button>
+          <button class="range-btn" onclick="setChartRange(0, this)">All</button>
+        </div>
+        <div class="charts-grid">
+          <div class="chart-wrap chart-wide">
+            <div class="chart-title">Time per day (minutes)</div>
+            <canvas id="chart-daily"></canvas>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Time by category</div>
+            <canvas id="chart-category"></canvas>
+          </div>
+          <div class="chart-wrap">
+            <div class="chart-title">Top tasks</div>
+            <canvas id="chart-tasks"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- DAY BREAKDOWN VIEW -->
+      <div class="chart-section" id="history-day-section">
+        <div class="day-nav">
+          <button class="btn-icon" onclick="shiftDayView(-1)">‹</button>
+          <div class="day-nav-label" id="day-nav-label">Today</div>
+          <button class="btn-icon" onclick="shiftDayView(1)">›</button>
+        </div>
+        <div class="day-range-row">
+          <button class="range-btn active" onclick="setDayViewMode('single', this)">Single Day</button>
+          <button class="range-btn" onclick="setDayViewMode('week', this)">Past 7 Days</button>
+        </div>
+        <div id="day-breakdown-content"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS VIEW -->
+    <div class="view" id="view-settings">
+      <div class="page-header">
+        <div class="page-title">Settings</div>
+      </div>
+      <div class="section-label">Connection</div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-label">Spreadsheet</div>
+          <div class="settings-row-sub" id="cfg-display-sheet">—</div>
+        </div>
+        <div class="settings-row-right">✓ connected</div>
+      </div>
+      <div class="settings-row">
+        <div>
+          <div class="settings-row-label">This device</div>
+          <div class="settings-row-sub" id="cfg-display-device">—</div>
+        </div>
+      </div>
+      <div class="section-label">Danger Zone</div>
+      <button class="btn-danger" onclick="disconnect()">Disconnect & Reset</button>
+
+      <div class="section-label" style="margin-top:1.5rem">Setup Guide</div>
+      <div id="setup-guide-text" style="font-size:0.82rem;color:var(--text-dim);line-height:1.7;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem;">
+        <strong style="color:var(--text)">1. Create a Google Sheet</strong><br>
+        Make a new Google Sheet and note the ID from the URL:<br>
+        <code style="color:var(--accent);font-size:0.78rem">docs.google.com/spreadsheets/d/<strong>SHEET_ID</strong>/edit</code><br><br>
+        <strong style="color:var(--text)">2. Create 3 tabs</strong><br>
+        Name them exactly: <code style="color:var(--accent)">checklist_items</code>, <code style="color:var(--accent)">active_timers</code>, <code style="color:var(--accent)">timer_log</code><br><br>
+        <strong style="color:var(--text)">3. Add headers to each tab</strong><br>
+        <code style="color:var(--accent);font-size:0.75rem">checklist_items</code> Row 1:<br>
+        id | title | category | location | device | tags | recurrence | days | emoji<br><br>
+        <code style="color:var(--accent);font-size:0.75rem">active_timers</code> Row 1:<br>
+        id | item_id | title | category | location | device | tags | start_time<br><br>
+        <code style="color:var(--accent);font-size:0.75rem">timer_log</code> Row 1:<br>
+        id | item_id | title | category | location | device | tags | start_time | end_time | duration_mins<br><br>
+        <strong style="color:var(--text)">4. Create an OAuth Client ID</strong><br>
+        • Go to console.cloud.google.com<br>
+        • Enable Google Sheets API (APIs & Services → Library)<br>
+        • Go to Credentials → Create Credentials → OAuth 2.0 Client ID<br>
+        • Application type: <strong>Web application</strong><br>
+        • Add your hosted URL to <em>Authorized JavaScript origins</em><br>
+        • Copy the Client ID<br><br>
+        <strong style="color:var(--text)">5. Paste Client ID into the app file</strong><br>
+        Open index.html in a text editor and replace:<br>
+        <code style="color:var(--accent);font-size:0.75rem">YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE</code><br>
+        with your actual Client ID, then re-upload to Netlify.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Nav -->
+  <div id="bottom-nav">
+    <div class="nav-item active" onclick="switchView('checklist', this)">
+      <div class="nav-icon">☑</div>
+      <div class="nav-label">Checklist</div>
+    </div>
+    <div class="nav-item" onclick="switchView('timer', this)">
+      <div class="nav-icon">⏱</div>
+      <div class="nav-label">Timer</div>
+    </div>
+    <div class="nav-item" onclick="switchView('history', this); loadHistory()">
+      <div class="nav-icon">📋</div>
+      <div class="nav-label">History</div>
+    </div>
+    <div class="nav-item" onclick="switchView('settings', this)">
+      <div class="nav-icon">⚙</div>
+      <div class="nav-label">Settings</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Add Checklist Item -->
+<div class="modal-overlay" id="modal-checklist">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Add Checklist Item</div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input class="form-input" id="cl-title" placeholder="Task name">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <div class="combobox-wrap">
+          <input class="combobox-input" id="cl-category" placeholder="Work" autocomplete="off" oninput="filterCombo('cl-category','cl-cat-drop')" onfocus="openCombo('cl-cat-drop')" onblur="closeComboDelayed('cl-cat-drop')">
+          <span class="combobox-arrow">▾</span>
+          <div class="combobox-dropdown" id="cl-cat-drop"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Emoji</label>
+        <input class="form-input" id="cl-emoji" placeholder="💼" maxlength="2" style="text-align:center;font-size:1.2rem">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Location</label>
+        <div class="combobox-wrap">
+          <input class="combobox-input" id="cl-location" placeholder="Home" autocomplete="off" oninput="filterCombo('cl-location','cl-loc-drop')" onfocus="openCombo('cl-loc-drop')" onblur="closeComboDelayed('cl-loc-drop')">
+          <span class="combobox-arrow">▾</span>
+          <div class="combobox-dropdown" id="cl-loc-drop"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Device</label>
+        <div class="combobox-wrap">
+          <input class="combobox-input" id="cl-device" placeholder="Any" autocomplete="off" oninput="filterCombo('cl-device','cl-dev-drop')" onfocus="openCombo('cl-dev-drop')" onblur="closeComboDelayed('cl-dev-drop')">
+          <span class="combobox-arrow">▾</span>
+          <div class="combobox-dropdown" id="cl-dev-drop"></div>
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tags</label>
+      <div class="combobox-wrap">
+        <input class="combobox-input" id="cl-tags" placeholder="morning, routine" autocomplete="off" oninput="filterCombo('cl-tags','cl-tag-drop')" onfocus="openCombo('cl-tag-drop')" onblur="closeComboDelayed('cl-tag-drop')">
+        <span class="combobox-arrow">▾</span>
+        <div class="combobox-dropdown" id="cl-tag-drop"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Recurrence</label>
+      <select class="form-select" id="cl-recurrence" onchange="toggleDaysPicker()">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </div>
+    <div class="form-group" id="days-picker-group" style="display:none">
+      <label class="form-label">Repeat on</label>
+      <div class="days-picker" id="days-picker">
+        <button class="day-btn" data-day="Mon" onclick="toggleDay(this)">M</button>
+        <button class="day-btn" data-day="Tue" onclick="toggleDay(this)">T</button>
+        <button class="day-btn" data-day="Wed" onclick="toggleDay(this)">W</button>
+        <button class="day-btn" data-day="Thu" onclick="toggleDay(this)">T</button>
+        <button class="day-btn" data-day="Fri" onclick="toggleDay(this)">F</button>
+        <button class="day-btn" data-day="Sat" onclick="toggleDay(this)">S</button>
+        <button class="day-btn" data-day="Sun" onclick="toggleDay(this)">S</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <div style="display:flex;gap:0.5rem">
+        <div class="toggle-type-btn active" id="type-btn-recurring" onclick="setItemType('recurring')">🔁 Recurring</div>
+        <div class="toggle-type-btn" id="type-btn-onetime" onclick="setItemType('onetime')">1️⃣ One-time</div>
+        <div class="toggle-type-btn" id="type-btn-goal" onclick="setItemType('goal')">🎯 Goal</div>
+      </div>
+      <input type="hidden" id="cl-item-type" value="recurring">
+    </div>
+    <div class="form-group" id="goal-mins-group" style="display:none">
+      <label class="form-label">Goal — minimum minutes</label>
+      <input class="form-input" id="cl-goal-mins" type="number" min="1" placeholder="e.g. 20">
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal('modal-checklist')">Cancel</button>
+      <button class="btn-primary" onclick="saveChecklistItem()">Add Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Setup Guide -->
+<div class="modal-overlay" id="modal-guide">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Setup Guide</div>
+    <div style="font-size:0.82rem;color:var(--text-dim);line-height:1.8">
+      <strong style="color:var(--text)">1. Create a Google Sheet</strong><br>
+      Copy the ID from the URL:<br>
+      <code style="color:var(--accent)">...spreadsheets/d/<u>THIS_PART</u>/edit</code><br><br>
+      <strong style="color:var(--text)">2. Add 3 sheet tabs</strong><br>
+      • <code style="color:var(--accent)">checklist_items</code><br>
+      • <code style="color:var(--accent)">active_timers</code><br>
+      • <code style="color:var(--accent)">timer_log</code><br><br>
+      <strong style="color:var(--text)">3. Row 1 headers for each tab:</strong><br><br>
+      <strong>checklist_items:</strong><br>
+      <code style="color:var(--accent);font-size:0.74rem">id | title | category | location | device | tags | recurrence | days | emoji</code><br><br>
+      <strong>active_timers:</strong><br>
+      <code style="color:var(--accent);font-size:0.74rem">id | item_id | title | category | location | device | tags | start_time</code><br><br>
+      <strong>timer_log:</strong><br>
+      <code style="color:var(--accent);font-size:0.74rem">id | item_id | title | category | location | device | tags | start_time | end_time | duration_mins</code><br><br>
+      <strong style="color:var(--text)">4. Create an OAuth 2.0 Client ID</strong><br>
+      console.cloud.google.com → APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client ID → Web application<br>
+      Add your Netlify URL to Authorized JavaScript origins.<br><br>
+      <strong style="color:var(--text)">5. Paste Client ID into index.html</strong><br>
+      Replace <code style="color:var(--accent)">YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE</code> in the file, then re-upload.
+    </div>
+    <div class="form-actions">
+      <button class="btn-primary" onclick="closeModal('modal-guide')">Got it</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// CONFIG & STATE
+// ═══════════════════════════════════════
+const GOOGLE_CLIENT_ID = '610013484788-0eqesj5ahr9ofou8kad48h9hl1c36hk6.apps.googleusercontent.com';
+
+let CFG = { sheetId: '', device: '' };
+let ACCESS_TOKEN = null;
+let TOKEN_EXPIRY = 0;
+let STATE = {
+  checklistItems: [], activeTimers: [],
+  currentRecurrence: 'daily',
+  historyFilter: 'all', historyItems: [],
+  historyView: 'list', chartRange: 7,
+  selectedDevice: '',
+  knownCategories: [], knownLocations: [], knownTags: [], knownDevices: [],
+  doneTodayIds: new Set(),
+  goalProgressMins: new Map()
+};
+let clockInterval = null, tokenClient = null, charts = {};
+
+const SHEETS = { checklist: 'checklist_items', active: 'active_timers', log: 'timer_log' };
+
+// Build done set and goal progress from log
+// Returns { doneIds: Set, goalProgress: Map<item_id, totalMins> }
+function buildDoneIds(logItems) {
+  const today = getTodayKey();
+  const week = getWeekKey();
+  const done = new Set();
+  const goalProgress = new Map(); // item_id -> total mins in period
+
+  logItems.forEach(entry => {
+    if (!entry.item_id || !entry.end_time) return;
+    const item = STATE.checklistItems.find(i => i.id === entry.item_id);
+    if (!item) return;
+    const entryDate = new Date(entry.end_time);
+    const entryKey = `${entryDate.getFullYear()}-${entryDate.getMonth()}-${entryDate.getDate()}`;
+
+    const isToday = entryKey === today;
+    const isThisWeek = (() => {
+      const d = new Date(entryDate);
+      const day = d.getDay();
+      const monday = new Date(d.setDate(d.getDate() - day + (day === 0 ? -6 : 1)));
+      return `${monday.getFullYear()}-${monday.getMonth()}-${monday.getDate()}` === week;
+    })();
+
+    const inPeriod = item.recurrence === 'daily' ? isToday : isThisWeek;
+    if (!inPeriod) return;
+
+    const mins = parseFloat(entry.duration_mins || 0);
+    const itemType = item.item_type || 'recurring';
+
+    if (itemType === 'goal') {
+      // Accumulate total time towards goal
+      goalProgress.set(entry.item_id, (goalProgress.get(entry.item_id) || 0) + mins);
+      const goalMins = parseFloat(item.goal_mins || 0);
+      if (goalMins > 0 && goalProgress.get(entry.item_id) >= goalMins) {
+        done.add(entry.item_id);
+      }
+    } else {
+      // Regular or one-time: any completed session marks it done
+      done.add(entry.item_id);
+    }
+  });
+
+  STATE.goalProgressMins = goalProgress;
+  return done;
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('cfg-device').value = detectDevice();
+  const saved = localStorage.getItem('chronicle_cfg');
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    CFG = { sheetId: parsed.sheetId || '', device: parsed.device || detectDevice() };
+    if (CFG.sheetId) document.getElementById('cfg-sheet-id').value = CFG.sheetId;
+    document.getElementById('cfg-device').value = CFG.device;
+  }
+  const waitForGIS = setInterval(() => {
+    if (window.google && window.google.accounts) { clearInterval(waitForGIS); initGoogleAuth(); }
+  }, 200);
+});
+
+function detectDevice() {
+  const ua = navigator.userAgent;
+  if (/iPhone/.test(ua)) return 'iPhone';
+  if (/iPad/.test(ua)) return 'iPad';
+  if (/Android/.test(ua)) return 'Android';
+  if (/Mac/.test(ua)) return 'Mac';
+  return 'Browser';
+}
+
+function initGoogleAuth() {
+  if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE') {
+    document.getElementById('auth-status').innerHTML = '⚠️ Replace the placeholder Client ID in the file.';
+    return;
+  }
+
+  const hasSavedConfig = !!localStorage.getItem('chronicle_cfg');
+
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    callback: (resp) => {
+      if (resp.error) {
+        // Silent re-auth failed, fall back to showing the login button
+        document.getElementById('auth-screen').style.display = 'flex';
+        document.getElementById('auth-status').textContent = 'Session expired — please sign in again.';
+        return;
+      }
+      ACCESS_TOKEN = resp.access_token;
+      TOKEN_EXPIRY = Date.now() + (resp.expires_in * 1000) - 60000;
+      if (document.getElementById('app').classList.contains('visible')) return; // already in app
+      startApp();
+    },
+  });
+
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: () => {} });
+
+  if (hasSavedConfig && CFG.sheetId) {
+    // Try to silently get a token without showing any UI
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('auth-status').textContent = 'Reconnecting...';
+    tokenClient.requestAccessToken({ prompt: '' });
+    // If silent auth fails after 8s, show the login screen
+    setTimeout(() => {
+      if (!ACCESS_TOKEN) {
+        document.getElementById('auth-screen').style.display = 'flex';
+        showSignInButton();
+        document.getElementById('auth-status').textContent = 'Session expired — please sign in again.';
+      }
+    }, 8000);
+  } else {
+    showSignInButton();
+  }
+}
+
+function showSignInButton() {
+  document.getElementById('google-signin-btn').innerHTML =
+    `<button class="btn-primary" onclick="requestToken()" style="margin-top:0">🔑 Sign in with Google</button>`;
+  document.getElementById('auth-status').textContent = 'Tap above to authorize access to your Google Sheet.';
+}
+
+function requestToken() {
+  const sheetId = document.getElementById('cfg-sheet-id').value.trim();
+  const device = document.getElementById('cfg-device').value.trim() || detectDevice();
+  if (!sheetId) { showToast('Please paste your Sheet ID first'); return; }
+  CFG = { sheetId, device };
+  localStorage.setItem('chronicle_cfg', JSON.stringify(CFG));
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
+}
+
+function handleTokenResponse(resp) {
+  if (resp.error) { document.getElementById('auth-status').textContent = 'Auth failed: ' + resp.error; return; }
+  ACCESS_TOKEN = resp.access_token;
+  TOKEN_EXPIRY = Date.now() + (resp.expires_in * 1000) - 60000;
+  startApp();
+}
+
+async function ensureToken() {
+  if (ACCESS_TOKEN && Date.now() < TOKEN_EXPIRY) return;
+  return new Promise((resolve, reject) => {
+    tokenClient.requestAccessToken({ prompt: '' });
+    const wait = setInterval(() => {
+      if (ACCESS_TOKEN && Date.now() < TOKEN_EXPIRY) { clearInterval(wait); resolve(); }
+    }, 300);
+    setTimeout(() => { clearInterval(wait); reject(new Error('Token refresh timeout')); }, 10000);
+  });
+}
+
+function startApp() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').classList.add('visible');
+  STATE.selectedDevice = CFG.device;
+  document.getElementById('cfg-display-sheet').textContent = CFG.sheetId.slice(0,20) + '...';
+  document.getElementById('cfg-display-device').textContent = CFG.device;
+  loadChecklist();
+  loadActiveTimers();
+  // 1-second clock for elapsed timers
+  clockInterval = setInterval(() => {
+    renderActiveTimers();
+    checkResets();
+    // Refresh preset elapsed times if timer view is visible
+    if (document.getElementById('view-timer')?.classList.contains('active')) renderPresets();
+  }, 1000);
+  // 15-second sync poll — keeps active timers and done status in sync across devices
+  setInterval(() => syncFromSheet(), 15000);
+}
+
+let isSyncing = false;
+async function syncFromSheet() {
+  if (isSyncing) return;
+  isSyncing = true;
+  try {
+    const [freshActive, freshLog] = await Promise.all([
+      sheetsGetAll(SHEETS.active),
+      sheetsGetAll(SHEETS.log)
+    ]);
+    const activeChanged = JSON.stringify(freshActive) !== JSON.stringify(STATE.activeTimers);
+    STATE.activeTimers = freshActive;
+    // Rebuild done status from log (sheet-authoritative, not localStorage)
+    STATE.doneTodayIds = buildDoneIds(freshLog);
+    if (activeChanged) { renderActiveTimers(); renderChecklist(); }
+    else renderChecklist(); // always re-render checklist to reflect done changes
+  } catch(e) { /* silent - don't disrupt UX on sync errors */ }
+  isSyncing = false;
+}
+
+function disconnect() {
+  if (!confirm('Disconnect and clear local config?')) return;
+  const tok = ACCESS_TOKEN;
+  localStorage.removeItem('chronicle_cfg');
+  ACCESS_TOKEN = null;
+  clearInterval(clockInterval);
+  document.getElementById('app').classList.remove('visible');
+  document.getElementById('auth-screen').style.display = 'flex';
+  if (tok) google.accounts.oauth2.revoke(tok, () => {});
+}
+
+// ── SHEETS API ──
+const BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
+
+async function sheetsGet(range) {
+  await ensureToken();
+  const r = await fetch(`${BASE}/${CFG.sheetId}/values/${encodeURIComponent(range)}`,
+    { headers: { Authorization: `Bearer ${ACCESS_TOKEN}` } });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function sheetsAppend(sheet, values) {
+  await ensureToken();
+  const url = `${BASE}/${CFG.sheetId}/values/${encodeURIComponent(sheet)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
+    body: JSON.stringify({ values })
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function sheetsGetAll(sheet) {
+  try {
+    const data = await sheetsGet(`${sheet}!A:Z`);
+    const rows = data.values || [];
+    if (rows.length < 2) return [];
+    const headers = rows[0];
+    return rows.slice(1).map(row => {
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = row[i] || '');
+      return obj;
+    });
+  } catch(e) { console.error(e); return []; }
+}
+
+async function sheetsDeleteRow(sheet, rowIndex) {
+  await ensureToken();
+  const sheetMeta = await fetch(`${BASE}/${CFG.sheetId}`,
+    { headers: { Authorization: `Bearer ${ACCESS_TOKEN}` } }).then(r => r.json());
+  const sheetObj = sheetMeta.sheets.find(s => s.properties.title === sheet);
+  if (!sheetObj) return;
+  const sheetId = sheetObj.properties.sheetId;
+  await fetch(`${BASE}/${CFG.sheetId}:batchUpdate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
+    body: JSON.stringify({ requests: [{ deleteDimension: {
+      range: { sheetId, dimension: 'ROWS', startIndex: rowIndex + 1, endIndex: rowIndex + 2 }
+    }}]})
+  });
+}
+
+// ── KNOWN VALUES / COMBOBOX ──
+function buildKnownValues() {
+  const all = [...STATE.checklistItems, ...STATE.historyItems];
+  const extract = (field) => [...new Set(all.map(i => i[field]).filter(Boolean))].sort();
+  const extractTags = () => {
+    const tags = new Set();
+    all.forEach(i => { if (i.tags) i.tags.split(',').map(t => t.trim()).filter(Boolean).forEach(t => tags.add(t)); });
+    return [...tags].sort();
+  };
+  const extractDevices = () => {
+    const devs = new Set([CFG.device, 'iPhone', 'Mac', 'iPad', 'Android', 'Browser']);
+    all.forEach(i => { if (i.device) devs.add(i.device); });
+    return [...devs].filter(Boolean).sort();
+  };
+  STATE.knownCategories = extract('category');
+  STATE.knownLocations = extract('location');
+  STATE.knownTags = extractTags();
+  STATE.knownDevices = extractDevices();
+  renderDeviceChips();
+}
+
+function renderDeviceChips() {
+  const wrap = document.getElementById('t-device-chips');
+  if (!wrap) return;
+  wrap.innerHTML = STATE.knownDevices.map(d =>
+    `<div class="device-chip ${STATE.selectedDevice === d ? 'selected' : ''}" onclick="selectDevice('${d}')">${d}</div>`
+  ).join('');
+}
+
+function selectDevice(d) { STATE.selectedDevice = d; renderDeviceChips(); }
+
+const COMBO_MAP = {
+  'cl-category': () => STATE.knownCategories, 'cl-location': () => STATE.knownLocations,
+  'cl-tags': () => STATE.knownTags, 'cl-device': () => STATE.knownDevices,
+  't-category': () => STATE.knownCategories, 't-location': () => STATE.knownLocations,
+  't-tags': () => STATE.knownTags,
+  'p-category': () => STATE.knownCategories, 'p-location': () => STATE.knownLocations,
+  'p-tags': () => STATE.knownTags,
+};
+
+function openCombo(dropId) {
+  const inputId = dropId.replace('-drop','');
+  populateCombo(inputId, dropId);
+  document.getElementById(dropId).classList.add('open');
+}
+function closeComboDelayed(dropId) {
+  setTimeout(() => document.getElementById(dropId)?.classList.remove('open'), 200);
+}
+function filterCombo(inputId, dropId) {
+  populateCombo(inputId, dropId);
+  document.getElementById(dropId).classList.add('open');
+}
+function populateCombo(inputId, dropId) {
+  const input = document.getElementById(inputId);
+  const drop = document.getElementById(dropId);
+  if (!input || !drop) return;
+  const val = input.value.toLowerCase();
+  const options = COMBO_MAP[inputId] ? COMBO_MAP[inputId]() : [];
+  const filtered = val ? options.filter(o => o.toLowerCase().includes(val)) : options;
+  drop.innerHTML = filtered.map(o =>
+    `<div class="combobox-option" onmousedown="pickCombo('${inputId}','${dropId}','${o.replace(/'/g,"\'")}')">${o}</div>`
+  ).join('') + (val && !filtered.find(f => f.toLowerCase() === val)
+    ? `<div class="combobox-option add-new" onmousedown="pickCombo('${inputId}','${dropId}','${val.replace(/'/g,"\'")}')">＋ Add "${val}"</div>`
+    : '');
+}
+function pickCombo(inputId, dropId, value) {
+  document.getElementById(inputId).value = value;
+  document.getElementById(dropId).classList.remove('open');
+}
+
+// ── CHECKLIST ──
+async function loadChecklist() {
+  setLoading(true);
+  STATE.checklistItems = await sheetsGetAll(SHEETS.checklist);
+  buildKnownValues();
+  renderChecklist();
+  setLoading(false);
+}
+
+function renderChecklist() {
+  const list = document.getElementById('checklist-list');
+  const dailyItems = STATE.checklistItems.filter(i => i.recurrence === 'daily');
+  const weeklyItems = STATE.checklistItems.filter(i => i.recurrence === 'weekly');
+
+  // Running timers section (all active, regardless of recurrence)
+  const runningHtml = renderChecklistSection(
+    STATE.activeTimers.length ? STATE.activeTimers.map(t => {
+      const item = STATE.checklistItems.find(i => i.id === t.item_id);
+      return item ? { item, active: t } : null;
+    }).filter(Boolean) : [],
+    [], [], 'running'
+  );
+
+  const dailyHtml = renderChecklistSection(
+    dailyItems.filter(i => STATE.activeTimers.find(t => t.item_id === i.id)).map(i => ({ item: i, active: STATE.activeTimers.find(t => t.item_id === i.id) })),
+    dailyItems.filter(i => !STATE.activeTimers.find(t => t.item_id === i.id) && !STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
+    dailyItems.filter(i => STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
+    'daily'
+  );
+
+  const weeklyHtml = renderChecklistSection(
+    weeklyItems.filter(i => STATE.activeTimers.find(t => t.item_id === i.id)).map(i => ({ item: i, active: STATE.activeTimers.find(t => t.item_id === i.id) })),
+    weeklyItems.filter(i => !STATE.activeTimers.find(t => t.item_id === i.id) && !STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
+    weeklyItems.filter(i => STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
+    'weekly'
+  );
+
+  list.innerHTML = runningHtml + dailyHtml + weeklyHtml;
+}
+
+function renderChecklistSection(inProgress, pending, done, type) {
+  // For 'running' section: skip if no timers at all
+  if (type === 'running') {
+    if (!inProgress.length) return '';
+    const title = `<span class="pulse-dot" style="display:inline-block;margin-right:0.4rem"></span>${inProgress.length} Running`;
+    const items = inProgress.map(({ item, active }) => renderChecklistItem(item, active)).join('');
+    return `<div class="checklist-section">
+      <div class="checklist-section-header">
+        <div class="checklist-section-title running">${title}</div>
+      </div>${items}</div>`;
+  }
+
+  const label = type === 'daily' ? '📅 Daily' : '📆 Weekly';
+  const allEmpty = !inProgress.length && !pending.length && !done.length;
+
+  let items = '';
+  inProgress.forEach(({ item, active }) => items += renderChecklistItem(item, active));
+  pending.forEach(({ item }) => items += renderChecklistItem(item, null));
+  done.forEach(({ item }) => items += renderChecklistItemDone(item));
+
+  if (allEmpty) {
+    items = `<div style="font-size:0.8rem;color:var(--text-muted);padding:0.5rem 0 0.25rem">No items yet — tap + to add one.</div>`;
+  }
+
+  return `<div class="checklist-section">
+    <div class="checklist-section-header">
+      <div class="checklist-section-title ${type}">${label}</div>
+      <button class="section-add-btn" onclick="openAddChecklistModalFor('${type}')">＋</button>
+    </div>${items}</div>`;
+}
+
+function renderChecklistItem(item, active) {
+  const elapsed = active ? formatElapsed(Date.now() - new Date(active.start_time).getTime()) : '';
+  const tagStr = [item.category, item.location, item.tags].filter(Boolean).join(' · ');
+  const itemType = item.item_type || 'recurring';
+
+  let extraHtml = '';
+  if (itemType === 'goal' && item.goal_mins) {
+    const goalMins = parseFloat(item.goal_mins);
+    const doneMins = STATE.goalProgressMins.get(item.id) || 0;
+    const activeMins = active ? (Date.now() - new Date(active.start_time).getTime()) / 60000 : 0;
+    const totalMins = doneMins + activeMins;
+    const pct = Math.min(100, Math.round((totalMins / goalMins) * 100));
+    const met = pct >= 100;
+    const label = met ? '✓' : `${pct}%`;
+    extraHtml = `<div class="goal-progress-wrap">
+      <div class="goal-bar-track"><div class="goal-bar-fill ${met?'met':''}" style="width:${pct}%"></div></div>
+      <div class="goal-pct ${met?'met':''}">${label}</div>
+    </div>`;
+  }
+
+  const typeBadge = itemType === 'onetime'
+    ? `<span style="font-size:0.65rem;font-family:var(--mono);color:var(--amber);background:var(--amber-dim);border-radius:4px;padding:0.1rem 0.35rem;margin-left:0.4rem">once</span>`
+    : itemType === 'goal'
+    ? `<span style="font-size:0.65rem;font-family:var(--mono);color:var(--accent);background:var(--accent-dim);border-radius:4px;padding:0.1rem 0.35rem;margin-left:0.4rem">goal</span>`
+    : '';
+
+  return `<div class="checklist-item ${active?'in-progress':''}"
+    onclick="handleChecklistTap('${item.id}')"
+    oncontextmenu="openItemMenu(event,'${item.id}')"
+    onpointerdown="startLongPress('${item.id}')"
+    onpointerup="cancelLongPress()"
+    onpointercancel="cancelLongPress()"
+    onpointermove="cancelLongPress()">
+    <div class="item-icon">${item.emoji||'📌'}</div>
+    <div class="item-body">
+      <div class="item-title">${item.title}${typeBadge}</div>
+      <div class="item-tags">${tagStr}</div>
+      ${extraHtml}
+    </div>
+    ${active?`<div class="item-status">${elapsed}</div>`:''}
+    <div class="item-chevron">›</div></div>`;
+}
+
+function renderChecklistItemDone(item) {
+  return `<div class="checklist-item done"
+    oncontextmenu="openItemMenu(event,'${item.id}')"
+    onpointerdown="startLongPress('${item.id}')"
+    onpointerup="cancelLongPress()"
+    onpointercancel="cancelLongPress()"
+    onpointermove="cancelLongPress()">
+    <div class="item-icon">✓</div>
+    <div class="item-body"><div class="item-title">${item.title}</div><div class="item-tags">${[item.category,item.location].filter(Boolean).join(' · ')}</div></div></div>`;
+}
+
+async function handleChecklistTap(itemId) {
+  const item = STATE.checklistItems.find(i => i.id === itemId);
+  if (!item) return;
+  const active = STATE.activeTimers.find(t => t.item_id === itemId);
+  if (active) { await stopTimer(active); return; }
+  if (STATE.doneTodayIds.has(item.id)) { showToast('Already done today!'); return; }
+  openDevicePickerForItem(item);
+}
+
+// ── LONG PRESS / CONTEXT MENU ──
+let longPressTimer = null;
+function startLongPress(itemId) {
+  cancelLongPress();
+  longPressTimer = setTimeout(() => { openItemMenu(null, itemId); }, 500);
+}
+function cancelLongPress() {
+  if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+}
+function openItemMenu(e, itemId) {
+  if (e) e.preventDefault();
+  cancelLongPress();
+  const item = STATE.checklistItems.find(i => i.id === itemId);
+  if (!item) return;
+  document.getElementById('item-menu-title').textContent = item.title;
+  document.getElementById('item-menu-edit').onclick = () => { closeModal('modal-item-menu'); openEditChecklistModal(itemId); };
+  document.getElementById('item-menu-delete').onclick = () => { closeModal('modal-item-menu'); deleteChecklistItem(itemId); };
+  document.getElementById('modal-item-menu').classList.add('open');
+}
+
+function openEditChecklistModal(itemId) {
+  const item = STATE.checklistItems.find(i => i.id === itemId);
+  if (!item) return;
+  document.getElementById('cl-title').value = item.title;
+  document.getElementById('cl-category').value = item.category || '';
+  document.getElementById('cl-location').value = item.location || '';
+  document.getElementById('cl-device').value = item.device || '';
+  document.getElementById('cl-tags').value = item.tags || '';
+  document.getElementById('cl-emoji').value = item.emoji || '';
+  document.getElementById('cl-recurrence').value = item.recurrence || 'daily';
+  document.getElementById('cl-goal-mins').value = item.goal_mins || '';
+  setItemType(item.item_type || 'recurring');
+  toggleDaysPicker();
+  if (item.days) {
+    item.days.split(',').forEach(day => {
+      const btn = document.querySelector(`.day-btn[data-day="${day.trim()}"]`);
+      if (btn) btn.classList.add('selected');
+    });
+  }
+  const saveBtn = document.querySelector('#modal-checklist .btn-primary');
+  saveBtn.textContent = 'Save Changes';
+  saveBtn.onclick = () => updateChecklistItem(itemId);
+  document.getElementById('modal-checklist').classList.add('open');
+}
+
+async function updateChecklistItem(itemId) {
+  const title = document.getElementById('cl-title').value.trim();
+  if (!title) { showToast('Please enter a title'); return; }
+  const recurrence = document.getElementById('cl-recurrence').value;
+  const days = recurrence === 'weekly'
+    ? Array.from(document.querySelectorAll('.day-btn.selected')).map(b => b.dataset.day).join(',') : '';
+  const itemType = document.getElementById('cl-item-type').value;
+  const goalMins = itemType === 'goal' ? (document.getElementById('cl-goal-mins').value.trim() || '') : '';
+  const updated = [
+    itemId, title,
+    document.getElementById('cl-category').value.trim(),
+    document.getElementById('cl-location').value.trim(),
+    document.getElementById('cl-device').value.trim(),
+    document.getElementById('cl-tags').value.trim(),
+    recurrence, days,
+    document.getElementById('cl-emoji').value.trim() || '📌',
+    itemType, goalMins
+  ];
+  try {
+    setLoading(true);
+    // Find row in sheet and update it
+    const all = await sheetsGetAll(SHEETS.checklist);
+    const rowIdx = all.findIndex(r => r.id === itemId);
+    if (rowIdx >= 0) {
+      await ensureToken();
+      const range = `${SHEETS.checklist}!A${rowIdx + 2}:I${rowIdx + 2}`;
+      await fetch(`${BASE}/${CFG.sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
+        body: JSON.stringify({ values: [updated] })
+      });
+    }
+    // Reset save button back to add mode
+    const saveBtn = document.querySelector('#modal-checklist .btn-primary');
+    saveBtn.textContent = 'Add Item';
+    saveBtn.onclick = saveChecklistItem;
+    closeModal('modal-checklist');
+    await loadChecklist();
+    showToast('Item updated!');
+  } catch(e) { showToast('Error: ' + e.message); }
+  setLoading(false);
+}
+
+async function deleteChecklistItem(itemId) {
+  const item = STATE.checklistItems.find(i => i.id === itemId);
+  if (!item || !confirm(`Delete "${item.title}"?`)) return;
+  try {
+    setLoading(true);
+    const all = await sheetsGetAll(SHEETS.checklist);
+    const rowIdx = all.findIndex(r => r.id === itemId);
+    if (rowIdx >= 0) await sheetsDeleteRow(SHEETS.checklist, rowIdx);
+    STATE.checklistItems = STATE.checklistItems.filter(i => i.id !== itemId);
+    renderChecklist();
+    showToast('Item deleted');
+  } catch(e) { showToast('Error: ' + e.message); }
+  setLoading(false);
+}
+
+function openDevicePickerForItem(item) {
+  const devices = STATE.knownDevices.length ? STATE.knownDevices : [CFG.device];
+  document.getElementById('device-pick-title').textContent = item.title;
+  const chips = document.getElementById('device-pick-chips');
+  chips.innerHTML = devices.map(d =>
+    `<div class="device-chip ${d === CFG.device ? 'selected' : ''}" onclick="toggleDevicePickChip(this)">${d}</div>`
+  ).join('');
+  document.getElementById('device-pick-confirm').onclick = async () => {
+    const sel = chips.querySelector('.device-chip.selected');
+    const chosenDevice = sel ? sel.textContent.trim() : CFG.device;
+    closeModal('modal-device-pick');
+    await startTimerFromItem(item, chosenDevice);
+  };
+  document.getElementById('modal-device-pick').classList.add('open');
+}
+
+function toggleDevicePickChip(el) {
+  document.querySelectorAll('#device-pick-chips .device-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function startTimerFromItem(item, deviceOverride) {
+  const device = deviceOverride || CFG.device;
+  const timer = { id: genId(), item_id: item.id, title: item.title,
+    category: item.category, location: item.location, device, tags: item.tags,
+    start_time: new Date().toISOString() };
+  try {
+    await sheetsAppend(SHEETS.active, [[
+      timer.id, timer.item_id, timer.title, timer.category,
+      timer.location, timer.device, timer.tags, timer.start_time
+    ]]);
+    STATE.activeTimers.push(timer);
+    renderChecklist(); renderActiveTimers();
+    showToast(`▶ Started: ${item.title}`);
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+async function saveChecklistItem() {
+  const title = document.getElementById('cl-title').value.trim();
+  if (!title) { showToast('Please enter a title'); return; }
+  const recurrence = document.getElementById('cl-recurrence').value;
+  const days = recurrence === 'weekly'
+    ? Array.from(document.querySelectorAll('.day-btn.selected')).map(b => b.dataset.day).join(',') : '';
+  const itemType = document.getElementById('cl-item-type').value; // recurring | onetime | goal
+  const goalMins = itemType === 'goal' ? (document.getElementById('cl-goal-mins').value.trim() || '') : '';
+  const item = [genId(), title,
+    document.getElementById('cl-category').value.trim(),
+    document.getElementById('cl-location').value.trim(),
+    document.getElementById('cl-device').value.trim(),
+    document.getElementById('cl-tags').value.trim(),
+    recurrence, days,
+    document.getElementById('cl-emoji').value.trim() || '📌',
+    itemType, goalMins];
+  try {
+    setLoading(true);
+    await sheetsAppend(SHEETS.checklist, [item]);
+    closeModal('modal-checklist');
+    await loadChecklist();
+    showToast('Item added!');
+  } catch(e) { showToast('Error: ' + e.message); }
+  setLoading(false);
+}
+
+// ── TIMERS ──
+async function loadActiveTimers() {
+  const [active, log] = await Promise.all([
+    sheetsGetAll(SHEETS.active),
+    sheetsGetAll(SHEETS.log)
+  ]);
+  STATE.activeTimers = active;
+  STATE.doneTodayIds = buildDoneIds(log);
+  renderActiveTimers();
+  renderChecklist();
+}
+
+function renderActiveTimers() {
+  const panel = document.getElementById('active-panel');
+  const list = document.getElementById('active-timers-list');
+  const count = STATE.activeTimers.length;
+  document.getElementById('active-count').textContent = `${count} running`;
+  if (count === 0) { panel.classList.remove('has-timers'); return; }
+  panel.classList.add('has-timers');
+  list.innerHTML = STATE.activeTimers.map(t => {
+    const elapsed = formatElapsed(Date.now() - new Date(t.start_time).getTime());
+    return `<div class="active-timer-chip">
+      <div class="atc-left"><div class="atc-title">${t.title}</div><div class="atc-meta">${[t.category,t.location].filter(Boolean).join(' · ')||t.device}</div></div>
+      <div class="atc-time">${elapsed}</div>
+      <button class="atc-stop" onclick="stopTimerById('${t.id}')">Stop</button></div>`;
+  }).join('');
+  if (document.getElementById('view-checklist').classList.contains('active')) renderChecklist();
+}
+
+async function stopTimerById(id) { const t = STATE.activeTimers.find(t => t.id === id); if (t) await stopTimer(t); }
+
+async function stopTimer(timer) {
+  const endTime = new Date().toISOString();
+  const durationMins = ((new Date(endTime) - new Date(timer.start_time)) / 60000).toFixed(2);
+  try {
+    await sheetsAppend(SHEETS.log, [[genId(), timer.item_id, timer.title, timer.category,
+      timer.location, timer.device, timer.tags, timer.start_time, endTime, durationMins]]);
+    const allActive = await sheetsGetAll(SHEETS.active);
+    const rowIdx = allActive.findIndex(r => r.id === timer.id);
+    if (rowIdx >= 0) await sheetsDeleteRow(SHEETS.active, rowIdx);
+
+    if (timer.item_id) {
+      const item = STATE.checklistItems.find(i => i.id === timer.item_id);
+      if (item) {
+        const itemType = item.item_type || 'recurring';
+
+        if (itemType === 'goal') {
+          // Update goal progress in memory
+          const prev = STATE.goalProgressMins.get(timer.item_id) || 0;
+          const next = prev + parseFloat(durationMins);
+          STATE.goalProgressMins.set(timer.item_id, next);
+          const goalMins = parseFloat(item.goal_mins || 0);
+          if (goalMins > 0 && next >= goalMins) {
+            STATE.doneTodayIds.add(timer.item_id);
+            showToast(`🎯 Goal met: ${item.title}!`);
+          } else {
+            const remaining = Math.max(0, goalMins - next).toFixed(0);
+            showToast(`✓ Stopped — ${remaining}min to goal`);
+          }
+        } else if (itemType === 'onetime') {
+          // Mark done and auto-delete from checklist
+          STATE.doneTodayIds.add(timer.item_id);
+          const all = await sheetsGetAll(SHEETS.checklist);
+          const clRowIdx = all.findIndex(r => r.id === timer.item_id);
+          if (clRowIdx >= 0) await sheetsDeleteRow(SHEETS.checklist, clRowIdx);
+          STATE.checklistItems = STATE.checklistItems.filter(i => i.id !== timer.item_id);
+          showToast(`✓ Done & removed: ${timer.title}`);
+        } else {
+          STATE.doneTodayIds.add(timer.item_id);
+          showToast(`✓ Stopped: ${timer.title} (${durationMins} min)`);
+        }
+      } else {
+        showToast(`✓ Stopped: ${timer.title} (${durationMins} min)`);
+      }
+    } else {
+      showToast(`✓ Stopped: ${timer.title} (${durationMins} min)`);
+    }
+
+    STATE.activeTimers = STATE.activeTimers.filter(t => t.id !== timer.id);
+    renderActiveTimers(); renderChecklist();
+  } catch(e) { showToast('Error stopping: ' + e.message); }
+}
+
+async function startManualTimer() {
+  const title = document.getElementById('t-title').value.trim();
+  if (!title) { showToast('Please enter a title'); return; }
+  const timer = { id: genId(), item_id: '', title,
+    category: document.getElementById('t-category').value.trim(),
+    location: document.getElementById('t-location').value.trim(),
+    device: STATE.selectedDevice || CFG.device,
+    tags: document.getElementById('t-tags').value.trim(),
+    start_time: new Date().toISOString() };
+  try {
+    await sheetsAppend(SHEETS.active, [[timer.id, timer.item_id, timer.title, timer.category,
+      timer.location, timer.device, timer.tags, timer.start_time]]);
+    STATE.activeTimers.push(timer);
+    renderActiveTimers();
+    showToast(`▶ Timer started!`);
+    ['t-title','t-category','t-location','t-tags'].forEach(id => document.getElementById(id).value = '');
+    switchView('checklist', document.querySelectorAll('.nav-item')[0]);
+  } catch(e) { showToast('Error: ' + e.message); }
+}
+
+// ── HISTORY ──
+async function loadHistory() {
+  setLoading(true);
+  const items = await sheetsGetAll(SHEETS.log);
+  STATE.historyItems = items.reverse();
+  buildKnownValues();
+  renderHistory();
+  setLoading(false);
+}
+
+function switchHistoryView(view, btn) {
+  STATE.historyView = view;
+  document.querySelectorAll('.hv-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('history-list-section').style.display = view === 'list' ? 'block' : 'none';
+  const gs = document.getElementById('history-graph-section');
+  const ds = document.getElementById('history-day-section');
+  if (view === 'graph') { gs.classList.add('visible'); ds.classList.remove('visible'); renderCharts(); }
+  else if (view === 'day') { ds.classList.add('visible'); gs.classList.remove('visible'); renderDayBreakdown(); }
+  else { gs.classList.remove('visible'); ds.classList.remove('visible'); }
+}
+
+// ── DAY BREAKDOWN ──
+let dayViewOffset = 0; // 0 = today, -1 = yesterday, etc.
+let dayViewMode = 'single'; // 'single' | 'week'
+
+function shiftDayView(dir) {
+  dayViewOffset += dir;
+  // Don't allow navigating into the future
+  if (dayViewOffset > 0) dayViewOffset = 0;
+  renderDayBreakdown();
+}
+
+function setDayViewMode(mode, btn) {
+  dayViewMode = mode;
+  document.querySelectorAll('.day-range-row .range-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderDayBreakdown();
+}
+
+function renderDayBreakdown() {
+  const content = document.getElementById('day-breakdown-content');
+  const label = document.getElementById('day-nav-label');
+
+  const baseDate = new Date();
+  baseDate.setDate(baseDate.getDate() + dayViewOffset);
+  baseDate.setHours(23, 59, 59, 999);
+
+  // Show/hide nav arrows based on mode
+  const days = dayViewMode === 'week' ? 7 : 1;
+
+  if (dayViewMode === 'single') {
+    const d = new Date(baseDate);
+    label.textContent = dayViewOffset === 0 ? 'Today'
+      : dayViewOffset === -1 ? 'Yesterday'
+      : d.toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' });
+  } else {
+    const end = new Date(baseDate);
+    const start = new Date(baseDate);
+    start.setDate(start.getDate() - 6);
+    label.textContent = `${start.toLocaleDateString('en',{month:'short',day:'numeric'})} – ${end.toLocaleDateString('en',{month:'short',day:'numeric'})}`;
+  }
+
+  // Build date list
+  const dates = [];
+  for (let i = 0; i < days; i++) {
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() - i);
+    dates.push(d);
+  }
+
+  // Filter history items to the date range
+  const startBound = new Date(dates[dates.length - 1]);
+  startBound.setHours(0, 0, 0, 0);
+  const endBound = new Date(dates[0]);
+  endBound.setHours(23, 59, 59, 999);
+
+  const relevant = STATE.historyItems.filter(item => {
+    if (!item.start_time) return false;
+    const t = new Date(item.start_time).getTime();
+    return t >= startBound.getTime() && t <= endBound.getTime();
+  });
+
+  if (!relevant.length) {
+    content.innerHTML = `<div class="day-empty">No entries for this period.</div>`;
+    return;
+  }
+
+  // Group by date
+  let html = '';
+  dates.forEach(date => {
+    const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    const dayItems = relevant.filter(item => {
+      const d = new Date(item.start_time);
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}` === dateKey;
+    }).sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+    if (!dayItems.length) return;
+
+    const totalMins = dayItems.reduce((s, i) => s + parseFloat(i.duration_mins || 0), 0);
+    const totalStr = totalMins >= 60 ? `${(totalMins/60).toFixed(1)}h` : `${Math.round(totalMins)}m`;
+    const dayLabel = date.toLocaleDateString('en', { weekday: 'long', month: 'short', day: 'numeric' });
+
+    // Category breakdown for this day
+    const catTotals = {};
+    dayItems.forEach(i => { const c = i.category || 'Other'; catTotals[c] = (catTotals[c]||0) + parseFloat(i.duration_mins||0); });
+    const summaryChips = Object.entries(catTotals).map(([c, m]) => {
+      const s = m >= 60 ? `${(m/60).toFixed(1)}h` : `${Math.round(m)}m`;
+      return `<div class="day-summary-chip">${c} <span>${s}</span></div>`;
+    }).join('');
+
+    const entries = dayItems.map(item => {
+      const start = new Date(item.start_time);
+      const timeStr = start.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const dur = parseFloat(item.duration_mins || 0);
+      const durStr = dur >= 60 ? `${(dur/60).toFixed(1)}h` : `${Math.round(dur)}m`;
+      const meta = [item.category, item.location, item.device].filter(Boolean).join(' · ');
+      return `<div class="timeline-entry">
+        <div class="timeline-time-col"><div class="timeline-time">${timeStr}</div></div>
+        <div class="timeline-line"></div>
+        <div class="timeline-card">
+          <div class="timeline-card-title">${item.title}</div>
+          <div class="timeline-card-meta">
+            <span class="timeline-card-dur">${durStr}</span>
+            ${meta ? `<span>${meta}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    html += `<div class="timeline-day">
+      <div class="timeline-day-header">
+        <span>${dayLabel}</span>
+        <span class="timeline-day-total">${totalStr} total</span>
+      </div>
+      <div class="day-summary-bar">${summaryChips}</div>
+      ${entries}
+    </div>`;
+  });
+
+  content.innerHTML = html || `<div class="day-empty">No entries for this period.</div>`;
+}
+
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  const filters = document.getElementById('history-filters');
+  const cats = [...new Set(STATE.historyItems.map(i => i.category).filter(Boolean))];
+  filters.innerHTML = `<div class="filter-chip ${STATE.historyFilter==='all'?'active':''}" onclick="setHistoryFilter('all',this)">All</div>` +
+    cats.map(c => `<div class="filter-chip ${STATE.historyFilter===c?'active':''}" onclick="setHistoryFilter('${c}',this)">${c}</div>`).join('');
+  let items = STATE.historyItems;
+  if (STATE.historyFilter !== 'all') items = items.filter(i => i.category === STATE.historyFilter);
+  if (!items.length) { list.innerHTML = `<div class="empty-state"><div class="big-icon">📋</div><p>No history yet.</p></div>`; return; }
+  list.innerHTML = items.map(item => {
+    const tags = item.tags ? item.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const dur = parseFloat(item.duration_mins || 0);
+    const durStr = dur >= 60 ? `${(dur/60).toFixed(1)}h` : `${dur.toFixed(0)}m`;
+    const dateStr = item.start_time ? new Date(item.start_time).toLocaleDateString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    const origIdx = STATE.historyItems.indexOf(item);
+    return `<div class="timer-card">
+      <div class="tc-header">
+        <div class="tc-title">${item.title}</div>
+        <div style="display:flex;align-items:center;gap:0.5rem">
+          <div class="tc-duration">${durStr}</div>
+          <button class="tc-delete" onclick="deleteHistoryItem(${origIdx})">🗑</button>
+        </div>
+      </div>
+      <div class="tc-meta">${dateStr}${item.device?' · '+item.device:''}</div>
+      ${tags.length?`<div class="tc-tags">${tags.map(t=>`<span class="tag-chip">${t}</span>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function deleteHistoryItem(origIdx) {
+  const item = STATE.historyItems[origIdx];
+  if (!item || !confirm(`Delete "${item.title}"?`)) return;
+  try {
+    setLoading(true);
+    const allItems = await sheetsGetAll(SHEETS.log);
+    const sheetIdx = allItems.findIndex(r => r.id === item.id || (r.start_time === item.start_time && r.title === item.title));
+    if (sheetIdx >= 0) {
+      await sheetsDeleteRow(SHEETS.log, sheetIdx);
+      STATE.historyItems.splice(origIdx, 1);
+      renderHistory();
+      if (STATE.historyView === 'graph') renderCharts();
+      showToast('Entry deleted');
+    } else { showToast('Could not find entry'); }
+  } catch(e) { showToast('Error: ' + e.message); }
+  setLoading(false);
+}
+
+function setHistoryFilter(cat, el) {
+  STATE.historyFilter = cat;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderHistory();
+}
+
+// ── CHARTS ──
+const CHART_COLORS = ['#5b8af5','#3ecf8e','#f59e0b','#ef4444','#a855f7','#06b6d4','#f97316','#84cc16'];
+
+function setChartRange(days, btn) {
+  STATE.chartRange = days;
+  document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderCharts();
+}
+
+function getFilteredForChart() {
+  if (!STATE.chartRange) return STATE.historyItems;
+  const cutoff = Date.now() - STATE.chartRange * 86400000;
+  return STATE.historyItems.filter(i => i.start_time && new Date(i.start_time).getTime() > cutoff);
+}
+
+function renderCharts() { const i = getFilteredForChart(); renderDailyChart(i); renderCategoryChart(i); renderTasksChart(i); }
+
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function chartAxes() {
+  return {
+    x: { ticks: { color: '#6b7280', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#2a2d35' } },
+    y: { ticks: { color: '#6b7280', font: { family: 'DM Mono', size: 10 } }, grid: { color: '#2a2d35' } }
+  };
+}
+
+function renderDailyChart(items) {
+  destroyChart('daily');
+  const byDate = {};
+  items.forEach(i => {
+    if (!i.start_time) return;
+    const d = new Date(i.start_time).toLocaleDateString('en',{month:'short',day:'numeric'});
+    byDate[d] = (byDate[d] || 0) + parseFloat(i.duration_mins || 0);
+  });
+  const labels = Object.keys(byDate);
+  const data = labels.map(l => Math.round(byDate[l]));
+  charts['daily'] = new Chart(document.getElementById('chart-daily').getContext('2d'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Minutes', data, backgroundColor: '#5b8af540', borderColor: '#5b8af5', borderWidth: 2, borderRadius: 4 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: chartAxes() }
+  });
+}
+
+function renderCategoryChart(items) {
+  destroyChart('category');
+  const byCat = {};
+  items.forEach(i => { const c = i.category||'Uncategorized'; byCat[c] = (byCat[c]||0) + parseFloat(i.duration_mins||0); });
+  const labels = Object.keys(byCat);
+  charts['category'] = new Chart(document.getElementById('chart-category').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: labels.map(l => Math.round(byCat[l])), backgroundColor: CHART_COLORS, borderColor: '#16181c', borderWidth: 2 }] },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#6b7280', font: { family: 'DM Mono', size: 11 }, padding: 12 } } } }
+  });
+}
+
+function renderTasksChart(items) {
+  destroyChart('tasks');
+  const byTask = {};
+  items.forEach(i => { byTask[i.title] = (byTask[i.title]||0) + parseFloat(i.duration_mins||0); });
+  const sorted = Object.entries(byTask).sort((a,b) => b[1]-a[1]).slice(0,8);
+  charts['tasks'] = new Chart(document.getElementById('chart-tasks').getContext('2d'), {
+    type: 'bar',
+    data: { labels: sorted.map(e=>e[0]), datasets: [{ label: 'Minutes', data: sorted.map(e=>Math.round(e[1])), backgroundColor: CHART_COLORS, borderRadius: 4 }] },
+    options: { responsive: true, indexAxis: 'y', plugins: { legend: { display: false } }, scales: chartAxes() }
+  });
+}
+
+// ── PRESETS ──
+// Presets are stored in localStorage (device-local, intentional — they're personal shortcuts)
+function loadPresets() {
+  try { return JSON.parse(localStorage.getItem('chronicle_presets') || '[]'); }
+  catch(e) { return []; }
+}
+function savePresets(presets) {
+  localStorage.setItem('chronicle_presets', JSON.stringify(presets));
+}
+
+let editingPresetId = null;
+
+function renderPresets() {
+  const presets = loadPresets();
+  const container = document.getElementById('presets-list');
+  if (!container) return;
+  if (!presets.length) {
+    container.innerHTML = `<div class="presets-empty">No quick starts yet — tap ＋ to add one.</div>`;
+    return;
+  }
+  container.innerHTML = `<div class="presets-grid">${presets.map((p, idx) => {
+    const active = STATE.activeTimers.find(t => t.title === p.title && !t.item_id);
+    const elapsed = active ? formatElapsed(Date.now() - new Date(active.start_time).getTime()) : '';
+    const meta = [p.category, p.location].filter(Boolean).join(' · ');
+    return `<div class="preset-card ${active ? 'running' : ''}" onclick="tapPreset(${idx})">
+      <button class="preset-card-delete" onclick="deletePreset(event,${idx})">✕</button>
+      <div class="preset-card-emoji">${p.emoji || '⏱'}</div>
+      <div class="preset-card-title">${p.title}</div>
+      ${meta ? `<div class="preset-card-meta">${meta}</div>` : ''}
+      ${active ? `<div class="preset-card-elapsed">${elapsed}</div>` : ''}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function tapPreset(idx) {
+  const presets = loadPresets();
+  const p = presets[idx];
+  if (!p) return;
+  // If a timer is already running for this preset, stop it
+  const active = STATE.activeTimers.find(t => t.title === p.title && !t.item_id);
+  if (active) { stopTimer(active); return; }
+  // Otherwise fill the form and let user choose device / start
+  document.getElementById('t-title').value = p.title;
+  document.getElementById('t-category').value = p.category || '';
+  document.getElementById('t-location').value = p.location || '';
+  document.getElementById('t-tags').value = p.tags || '';
+  // Scroll down to the form
+  document.getElementById('view-timer').querySelector('.start-timer-btn').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  showToast(`"${p.title}" loaded — pick a device and start!`);
+}
+
+function deletePreset(e, idx) {
+  e.stopPropagation();
+  const presets = loadPresets();
+  if (!confirm(`Remove "${presets[idx]?.title}" from Quick Start?`)) return;
+  presets.splice(idx, 1);
+  savePresets(presets);
+  renderPresets();
+}
+
+function openAddPresetModal(idx = null) {
+  editingPresetId = idx;
+  const presets = loadPresets();
+  const p = idx !== null ? presets[idx] : null;
+  document.getElementById('preset-modal-title').textContent = p ? 'Edit Quick Start' : 'Add Quick Start';
+  document.getElementById('p-title').value = p?.title || '';
+  document.getElementById('p-category').value = p?.category || '';
+  document.getElementById('p-location').value = p?.location || '';
+  document.getElementById('p-tags').value = p?.tags || '';
+  document.getElementById('p-emoji').value = p?.emoji || '';
+  document.getElementById('modal-preset').classList.add('open');
+}
+
+function savePreset() {
+  const title = document.getElementById('p-title').value.trim();
+  if (!title) { showToast('Please enter a title'); return; }
+  const preset = {
+    id: genId(),
+    title,
+    category: document.getElementById('p-category').value.trim(),
+    location: document.getElementById('p-location').value.trim(),
+    tags: document.getElementById('p-tags').value.trim(),
+    emoji: document.getElementById('p-emoji').value.trim() || '⏱',
+  };
+  const presets = loadPresets();
+  if (editingPresetId !== null) presets[editingPresetId] = preset;
+  else presets.push(preset);
+  savePresets(presets);
+  closeModal('modal-preset');
+  renderPresets();
+  showToast(editingPresetId !== null ? 'Preset updated!' : 'Quick start added!');
+  editingPresetId = null;
+}
+
+// ── RESETS ──
+function getTodayKey() { const d=new Date(); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; }
+function getWeekKey() {
+  const d = new Date(), day = d.getDay();
+  const monday = new Date(d.setDate(d.getDate() - day + (day===0?-6:1)));
+  return `${monday.getFullYear()}-${monday.getMonth()}-${monday.getDate()}`;
+}
+function checkResets() {
+  // doneTodayIds is rebuilt from the sheet on every sync, so no manual reset needed.
+  // Just clean up any legacy localStorage done_ keys from the old system.
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('done_')) { localStorage.removeItem(key); i--; }
+  }
+}
+
+// ── UI ──
+function switchView(name, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'timer') { renderDeviceChips(); renderPresets(); }
+}
+function openAddChecklistModal() { openAddChecklistModalFor('daily'); }
+function openAddChecklistModalFor(type) {
+  document.getElementById('modal-checklist').classList.add('open');
+  document.getElementById('cl-recurrence').value = type || 'daily';
+  toggleDaysPicker();
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  // Reset checklist modal save button if it was in edit mode
+  if (id === 'modal-checklist') {
+    const saveBtn = document.querySelector('#modal-checklist .btn-primary');
+    if (saveBtn && saveBtn.textContent !== 'Add Item') {
+      saveBtn.textContent = 'Add Item';
+      saveBtn.onclick = saveChecklistItem;
+      document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('selected'));
+    }
+    setItemType('recurring');
+  }
+}
+function showSetupGuide() { document.getElementById('modal-guide').classList.add('open'); }
+function toggleDaysPicker() {
+  document.getElementById('days-picker-group').style.display =
+    document.getElementById('cl-recurrence').value === 'weekly' ? 'block' : 'none';
+}
+function setItemType(type) {
+  document.getElementById('cl-item-type').value = type;
+  ['recurring','onetime','goal'].forEach(t => {
+    document.getElementById(`type-btn-${t}`)?.classList.toggle('active', t === type);
+  });
+  document.getElementById('goal-mins-group').style.display = type === 'goal' ? 'block' : 'none';
+}
+function toggleDay(btn) { btn.classList.toggle('selected'); }
+function setLoading(on) {
+  document.getElementById('loading-bar').style.width = on ? '70%' : '100%';
+  if (!on) setTimeout(() => document.getElementById('loading-bar').style.width = '0', 300);
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+function formatElapsed(ms) {
+  const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+}
+function pad(n) { return String(n).padStart(2,'0'); }
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+});
+</script>
+<!-- MODAL: Item Menu -->
+<div class="modal-overlay" id="modal-item-menu">
+  <div class="modal-sheet" style="padding-bottom: calc(1rem + var(--safe-bottom))">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="item-menu-title" style="font-size:0.95rem;margin-bottom:1rem"></div>
+    <button id="item-menu-edit" style="display:flex;align-items:center;gap:0.75rem;width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:0.85rem 1rem;color:var(--text);font-size:0.9rem;font-weight:500;cursor:pointer;font-family:var(--sans);margin-bottom:0.5rem">
+      ✏️ <span>Edit item</span>
+    </button>
+    <button id="item-menu-delete" style="display:flex;align-items:center;gap:0.75rem;width:100%;background:var(--red-dim);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:0.85rem 1rem;color:var(--red);font-size:0.9rem;font-weight:500;cursor:pointer;font-family:var(--sans);margin-bottom:0.75rem">
+      🗑 <span>Delete item</span>
+    </button>
+    <button onclick="closeModal('modal-item-menu')" class="btn-secondary">Cancel</button>
+  </div>
+</div>
+
+<!-- MODAL: Add/Edit Preset -->
+<div class="modal-overlay" id="modal-preset">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="preset-modal-title">Add Quick Start</div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input class="form-input" id="p-title" placeholder="The Finals">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <div class="combobox-wrap">
+          <input class="combobox-input" id="p-category" placeholder="Gaming" autocomplete="off" oninput="filterCombo('p-category','p-cat-drop')" onfocus="openCombo('p-cat-drop')" onblur="closeComboDelayed('p-cat-drop')">
+          <span class="combobox-arrow">▾</span>
+          <div class="combobox-dropdown" id="p-cat-drop"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Emoji</label>
+        <input class="form-input" id="p-emoji" placeholder="🎮" maxlength="2" style="text-align:center;font-size:1.2rem">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Location</label>
+      <div class="combobox-wrap">
+        <input class="combobox-input" id="p-location" placeholder="Home" autocomplete="off" oninput="filterCombo('p-location','p-loc-drop')" onfocus="openCombo('p-loc-drop')" onblur="closeComboDelayed('p-loc-drop')">
+        <span class="combobox-arrow">▾</span>
+        <div class="combobox-dropdown" id="p-loc-drop"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Tags</label>
+      <div class="combobox-wrap">
+        <input class="combobox-input" id="p-tags" placeholder="gaming, relaxing" autocomplete="off" oninput="filterCombo('p-tags','p-tag-drop')" onfocus="openCombo('p-tag-drop')" onblur="closeComboDelayed('p-tag-drop')">
+        <span class="combobox-arrow">▾</span>
+        <div class="combobox-dropdown" id="p-tag-drop"></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal('modal-preset')">Cancel</button>
+      <button class="btn-primary" id="preset-save-btn" onclick="savePreset()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Device Picker -->
+<div class="modal-overlay" id="modal-device-pick">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Start Timer</div>
+    <div style="font-size:0.85rem;color:var(--text-dim);margin-bottom:1rem">Which device is doing this task?</div>
+    <div style="font-size:0.8rem;font-family:var(--mono);color:var(--text-dim);margin-bottom:0.5rem;text-transform:uppercase;letter-spacing:0.08em" id="device-pick-title"></div>
+    <div class="device-chips" id="device-pick-chips" style="margin-bottom:1.25rem"></div>
+    <div class="form-actions">
+      <button class="btn-secondary" onclick="closeModal('modal-device-pick')">Cancel</button>
+      <button class="btn-primary" id="device-pick-confirm">▶ Start</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
