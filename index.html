@@ -922,16 +922,16 @@
         <div class="form-group">
           <label class="form-label">Category</label>
           <div class="combobox-wrap">
-            <input class="combobox-input" id="t-category" placeholder="Work" autocomplete="off" oninput="filterCombo('t-category','t-cat-drop')" onfocus="openCombo('t-cat-drop')" onblur="closeComboDelayed('t-cat-drop')">
-            <span class="combobox-arrow">▾</span>
+            <input class="combobox-input" id="t-category" placeholder="Work" autocomplete="off" oninput="filterCombo('t-category','t-cat-drop')" onclick="openCombo('t-cat-drop')" onblur="closeComboDelayed('t-cat-drop')">
+            <span class="combobox-arrow" onmousedown="event.preventDefault();openCombo('t-cat-drop')">▾</span>
             <div class="combobox-dropdown" id="t-cat-drop"></div>
           </div>
         </div>
         <div class="form-group">
           <label class="form-label">Location</label>
           <div class="combobox-wrap">
-            <input class="combobox-input" id="t-location" placeholder="Office" autocomplete="off" oninput="filterCombo('t-location','t-loc-drop')" onfocus="openCombo('t-loc-drop')" onblur="closeComboDelayed('t-loc-drop')">
-            <span class="combobox-arrow">▾</span>
+            <input class="combobox-input" id="t-location" placeholder="Office" autocomplete="off" oninput="filterCombo('t-location','t-loc-drop')" onclick="openCombo('t-loc-drop')" onblur="closeComboDelayed('t-loc-drop')">
+            <span class="combobox-arrow" onmousedown="event.preventDefault();openCombo('t-loc-drop')">▾</span>
             <div class="combobox-dropdown" id="t-loc-drop"></div>
           </div>
         </div>
@@ -1086,8 +1086,8 @@
       <div class="form-group">
         <label class="form-label">Category</label>
         <div class="combobox-wrap">
-          <input class="combobox-input" id="cl-category" placeholder="Work" autocomplete="off" oninput="filterCombo('cl-category','cl-cat-drop')" onfocus="openCombo('cl-cat-drop')" onblur="closeComboDelayed('cl-cat-drop')">
-          <span class="combobox-arrow">▾</span>
+          <input class="combobox-input" id="cl-category" placeholder="Work" autocomplete="off" oninput="filterCombo('cl-category','cl-cat-drop')" onclick="openCombo('cl-cat-drop')" onblur="closeComboDelayed('cl-cat-drop')">
+          <span class="combobox-arrow" onmousedown="event.preventDefault();openCombo('cl-cat-drop')">▾</span>
           <div class="combobox-dropdown" id="cl-cat-drop"></div>
         </div>
       </div>
@@ -1100,8 +1100,8 @@
       <div class="form-group">
         <label class="form-label">Location</label>
         <div class="combobox-wrap">
-          <input class="combobox-input" id="cl-location" placeholder="Home" autocomplete="off" oninput="filterCombo('cl-location','cl-loc-drop')" onfocus="openCombo('cl-loc-drop')" onblur="closeComboDelayed('cl-loc-drop')">
-          <span class="combobox-arrow">▾</span>
+          <input class="combobox-input" id="cl-location" placeholder="Home" autocomplete="off" oninput="filterCombo('cl-location','cl-loc-drop')" onclick="openCombo('cl-loc-drop')" onblur="closeComboDelayed('cl-loc-drop')">
+          <span class="combobox-arrow" onmousedown="event.preventDefault();openCombo('cl-loc-drop')">▾</span>
           <div class="combobox-dropdown" id="cl-loc-drop"></div>
         </div>
       </div>
@@ -2486,8 +2486,8 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
       <div class="form-group">
         <label class="form-label">Category</label>
         <div class="combobox-wrap">
-          <input class="combobox-input" id="p-category" placeholder="Gaming" autocomplete="off" oninput="filterCombo('p-category','p-cat-drop')" onfocus="openCombo('p-cat-drop')" onblur="closeComboDelayed('p-cat-drop')">
-          <span class="combobox-arrow">▾</span>
+          <input class="combobox-input" id="p-category" placeholder="Gaming" autocomplete="off" oninput="filterCombo('p-category','p-cat-drop')" onclick="openCombo('p-cat-drop')" onblur="closeComboDelayed('p-cat-drop')">
+          <span class="combobox-arrow" onmousedown="event.preventDefault();openCombo('p-cat-drop')">▾</span>
           <div class="combobox-dropdown" id="p-cat-drop"></div>
         </div>
       </div>
@@ -2499,8 +2499,8 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
     <div class="form-group">
       <label class="form-label">Location</label>
       <div class="combobox-wrap">
-        <input class="combobox-input" id="p-location" placeholder="Home" autocomplete="off" oninput="filterCombo('p-location','p-loc-drop')" onfocus="openCombo('p-loc-drop')" onblur="closeComboDelayed('p-loc-drop')">
-        <span class="combobox-arrow">▾</span>
+        <input class="combobox-input" id="p-location" placeholder="Home" autocomplete="off" oninput="filterCombo('p-location','p-loc-drop')" onclick="openCombo('p-loc-drop')" onblur="closeComboDelayed('p-loc-drop')">
+        <span class="combobox-arrow" onmousedown="event.preventDefault();openCombo('p-loc-drop')">▾</span>
         <div class="combobox-dropdown" id="p-loc-drop"></div>
       </div>
     </div>
