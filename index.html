@@ -843,42 +843,6 @@
     width: 100%;
     margin-top: 0.5rem;
   }
-
-  /* ── SPLASH SCREEN ── */
-  #splash-screen {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100dvh;
-    gap: 1.5rem;
-    background: var(--bg);
-    position: fixed;
-    inset: 0;
-    z-index: 500;
-  }
-  #splash-screen.hidden { display: none; }
-  .splash-logo {
-    font-family: var(--mono);
-    font-size: 2.5rem;
-    font-weight: 500;
-    letter-spacing: -0.05em;
-    color: var(--text);
-  }
-  .splash-logo span { color: var(--accent); }
-  .splash-spinner {
-    width: 28px; height: 28px;
-    border: 2px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .splash-status {
-    font-size: 0.8rem;
-    color: var(--text-dim);
-    font-family: var(--mono);
-  }
 </style>
 </head>
 <body>
@@ -886,15 +850,8 @@
 <div class="loading-bar" id="loading-bar"></div>
 <div id="toast"></div>
 
-<!-- SPLASH SCREEN (shown while silent auth is in progress) -->
-<div id="splash-screen">
-  <div class="splash-logo">chron<span>.</span>icle</div>
-  <div class="splash-spinner"></div>
-  <div class="splash-status" id="splash-status">Connecting…</div>
-</div>
-
-<!-- AUTH SCREEN (only shown for first-time setup or when token truly expires) -->
-<div id="auth-screen" style="display:none">
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
   <div>
     <div class="auth-logo">chron<span>.</span>icle</div>
   </div>
@@ -977,14 +934,6 @@
             <span class="combobox-arrow">▾</span>
             <div class="combobox-dropdown" id="t-loc-drop"></div>
           </div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Tags</label>
-        <div class="combobox-wrap">
-          <input class="combobox-input" id="t-tags" placeholder="focus, deep-work, client" autocomplete="off" oninput="filterCombo('t-tags','t-tag-drop')" onfocus="openCombo('t-tag-drop')" onblur="closeComboDelayed('t-tag-drop')">
-          <span class="combobox-arrow">▾</span>
-          <div class="combobox-dropdown" id="t-tag-drop"></div>
         </div>
       </div>
       <div class="form-group">
@@ -1166,14 +1115,6 @@
       </div>
     </div>
     <div class="form-group">
-      <label class="form-label">Tags</label>
-      <div class="combobox-wrap">
-        <input class="combobox-input" id="cl-tags" placeholder="morning, routine" autocomplete="off" oninput="filterCombo('cl-tags','cl-tag-drop')" onfocus="openCombo('cl-tag-drop')" onblur="closeComboDelayed('cl-tag-drop')">
-        <span class="combobox-arrow">▾</span>
-        <div class="combobox-dropdown" id="cl-tag-drop"></div>
-      </div>
-    </div>
-    <div class="form-group">
       <label class="form-label">Recurrence</label>
       <select class="form-select" id="cl-recurrence" onchange="toggleDaysPicker()">
         <option value="daily">Daily</option>
@@ -1265,7 +1206,12 @@ let STATE = {
 };
 let clockInterval = null, tokenClient = null, charts = {};
 
-const SHEETS = { checklist: 'checklist_items', active: 'active_timers', log: 'timer_log' };
+const SHEETS = { checklist: 'checklist_items', active: 'active_timers', log: 'timer_log', presets: 'quick_starts' };
+
+// 25002500 SEEDED DEFAULTS 25002500
+const DEFAULT_CATEGORIES = ['Lifestyle','Work','TTRPG','Media','Video Game','Chore','Reading','Coding','Hobby'];
+const DEFAULT_LOCATIONS  = ['Home','Work','Commute'];
+const FIXED_DEVICES      = ['Phone','Desktop','Laptop','None'];
 
 // Build done set and goal progress from log
 // Returns { doneIds: Set, goalProgress: Map<item_id, totalMins> }
@@ -1322,23 +1268,9 @@ window.addEventListener('DOMContentLoaded', () => {
     if (CFG.sheetId) document.getElementById('cfg-sheet-id').value = CFG.sheetId;
     document.getElementById('cfg-device').value = CFG.device;
   }
-  // If no saved config, skip splash and go straight to setup
-  if (!saved || !CFG.sheetId) {
-    hideSplash();
-    document.getElementById('auth-screen').style.display = 'flex';
-  }
-  setSplashStatus('Loading…');
   const waitForGIS = setInterval(() => {
     if (window.google && window.google.accounts) { clearInterval(waitForGIS); initGoogleAuth(); }
   }, 200);
-  // If GIS script never loads (e.g. offline), fall back after 12s
-  setTimeout(() => {
-    if (!window.google) {
-      hideSplash();
-      document.getElementById('auth-screen').style.display = 'flex';
-      document.getElementById('auth-status').textContent = 'Could not connect — check your internet and reload.';
-    }
-  }, 12000);
 });
 
 function detectDevice() {
@@ -1352,62 +1284,47 @@ function detectDevice() {
 
 function initGoogleAuth() {
   if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE') {
-    hideSplash();
-    document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('auth-status').innerHTML = '⚠️ Replace the placeholder Client ID in the file.';
     return;
   }
 
-  const hasSavedConfig = !!(localStorage.getItem('chronicle_cfg') && CFG.sheetId);
+  const hasSavedConfig = !!localStorage.getItem('chronicle_cfg');
 
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/spreadsheets',
     callback: (resp) => {
       if (resp.error) {
-        // Silent re-auth failed — show login screen
-        hideSplash();
+        // Silent re-auth failed, fall back to showing the login button
         document.getElementById('auth-screen').style.display = 'flex';
-        showSignInButton();
         document.getElementById('auth-status').textContent = 'Session expired — please sign in again.';
         return;
       }
       ACCESS_TOKEN = resp.access_token;
       TOKEN_EXPIRY = Date.now() + (resp.expires_in * 1000) - 60000;
-      if (document.getElementById('app').classList.contains('visible')) return;
-      hideSplash();
+      if (document.getElementById('app').classList.contains('visible')) return; // already in app
       startApp();
     },
   });
 
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: () => {} });
 
-  if (hasSavedConfig) {
-    // Stay on splash, attempt silent token — no UI flicker
-    setSplashStatus('Signing in…');
+  if (hasSavedConfig && CFG.sheetId) {
+    // Try to silently get a token without showing any UI
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('auth-status').textContent = 'Reconnecting...';
     tokenClient.requestAccessToken({ prompt: '' });
-    // Give Google up to 15s on slow mobile connections before falling back
+    // If silent auth fails after 5s, show the login screen
     setTimeout(() => {
       if (!ACCESS_TOKEN) {
-        hideSplash();
         document.getElementById('auth-screen').style.display = 'flex';
         showSignInButton();
         document.getElementById('auth-status').textContent = 'Session expired — please sign in again.';
       }
-    }, 15000);
+    }, 5000);
   } else {
-    // First time — go straight to setup screen
-    hideSplash();
-    document.getElementById('auth-screen').style.display = 'flex';
     showSignInButton();
   }
-}
-
-function hideSplash() {
-  document.getElementById('splash-screen').classList.add('hidden');
-}
-function setSplashStatus(msg) {
-  document.getElementById('splash-status').textContent = msg;
 }
 
 function showSignInButton() {
@@ -1422,7 +1339,7 @@ function requestToken() {
   if (!sheetId) { showToast('Please paste your Sheet ID first'); return; }
   CFG = { sheetId, device };
   localStorage.setItem('chronicle_cfg', JSON.stringify(CFG));
-  tokenClient.requestAccessToken({ prompt: 'select_account' });
+  tokenClient.requestAccessToken({ prompt: 'consent' });
 }
 
 function handleTokenResponse(resp) {
@@ -1451,6 +1368,7 @@ function startApp() {
   document.getElementById('cfg-display-device').textContent = CFG.device;
   loadChecklist();
   loadActiveTimers();
+  loadPresets();
   // 1-second clock for elapsed timers
   clockInterval = setInterval(() => {
     renderActiveTimers();
@@ -1548,28 +1466,21 @@ async function sheetsDeleteRow(sheet, rowIndex) {
 // ── KNOWN VALUES / COMBOBOX ──
 function buildKnownValues() {
   const all = [...STATE.checklistItems, ...STATE.historyItems];
-  const extract = (field) => [...new Set(all.map(i => i[field]).filter(Boolean))].sort();
-  const extractTags = () => {
-    const tags = new Set();
-    all.forEach(i => { if (i.tags) i.tags.split(',').map(t => t.trim()).filter(Boolean).forEach(t => tags.add(t)); });
-    return [...tags].sort();
+  // Merge seeded defaults with any extras found in sheet data
+  const mergeWithDefaults = (defaults, field) => {
+    const fromData = all.map(i => i[field]).filter(Boolean);
+    return [...new Set([...defaults, ...fromData])].sort();
   };
-  const extractDevices = () => {
-    const devs = new Set([CFG.device, 'iPhone', 'Mac', 'iPad', 'Android', 'Browser']);
-    all.forEach(i => { if (i.device) devs.add(i.device); });
-    return [...devs].filter(Boolean).sort();
-  };
-  STATE.knownCategories = extract('category');
-  STATE.knownLocations = extract('location');
-  STATE.knownTags = extractTags();
-  STATE.knownDevices = extractDevices();
+  STATE.knownCategories = mergeWithDefaults(DEFAULT_CATEGORIES, 'category');
+  STATE.knownLocations  = mergeWithDefaults(DEFAULT_LOCATIONS, 'location');
+  STATE.knownDevices    = FIXED_DEVICES; // always exactly these four
   renderDeviceChips();
 }
 
 function renderDeviceChips() {
   const wrap = document.getElementById('t-device-chips');
   if (!wrap) return;
-  wrap.innerHTML = STATE.knownDevices.map(d =>
+  wrap.innerHTML = FIXED_DEVICES.map(d =>
     `<div class="device-chip ${STATE.selectedDevice === d ? 'selected' : ''}" onclick="selectDevice('${d}')">${d}</div>`
   ).join('');
 }
@@ -1578,11 +1489,9 @@ function selectDevice(d) { STATE.selectedDevice = d; renderDeviceChips(); }
 
 const COMBO_MAP = {
   'cl-category': () => STATE.knownCategories, 'cl-location': () => STATE.knownLocations,
-  'cl-tags': () => STATE.knownTags, 'cl-device': () => STATE.knownDevices,
+  'cl-device': () => STATE.knownDevices,
   't-category': () => STATE.knownCategories, 't-location': () => STATE.knownLocations,
-  't-tags': () => STATE.knownTags,
   'p-category': () => STATE.knownCategories, 'p-location': () => STATE.knownLocations,
-  'p-tags': () => STATE.knownTags,
 };
 
 function openCombo(dropId) {
@@ -1688,7 +1597,7 @@ function renderChecklistSection(inProgress, pending, done, type) {
 
 function renderChecklistItem(item, active) {
   const elapsed = active ? formatElapsed(Date.now() - new Date(active.start_time).getTime()) : '';
-  const tagStr = [item.category, item.location, item.tags].filter(Boolean).join(' · ');
+  const tagStr = [item.category, item.location].filter(Boolean).join(' · ');
   const itemType = item.item_type || 'recurring';
 
   let extraHtml = '';
@@ -1776,7 +1685,6 @@ function openEditChecklistModal(itemId) {
   document.getElementById('cl-category').value = item.category || '';
   document.getElementById('cl-location').value = item.location || '';
   document.getElementById('cl-device').value = item.device || '';
-  document.getElementById('cl-tags').value = item.tags || '';
   document.getElementById('cl-emoji').value = item.emoji || '';
   document.getElementById('cl-recurrence').value = item.recurrence || 'daily';
   document.getElementById('cl-goal-mins').value = item.goal_mins || '';
@@ -1807,19 +1715,17 @@ async function updateChecklistItem(itemId) {
     document.getElementById('cl-category').value.trim(),
     document.getElementById('cl-location').value.trim(),
     document.getElementById('cl-device').value.trim(),
-    document.getElementById('cl-tags').value.trim(),
     recurrence, days,
     document.getElementById('cl-emoji').value.trim() || '📌',
     itemType, goalMins
   ];
   try {
     setLoading(true);
-    // Find row in sheet and update it
     const all = await sheetsGetAll(SHEETS.checklist);
     const rowIdx = all.findIndex(r => r.id === itemId);
     if (rowIdx >= 0) {
       await ensureToken();
-      const range = `${SHEETS.checklist}!A${rowIdx + 2}:I${rowIdx + 2}`;
+      const range = `${SHEETS.checklist}!A${rowIdx + 2}:J${rowIdx + 2}`;
       await fetch(`${BASE}/${CFG.sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
@@ -1876,12 +1782,12 @@ function toggleDevicePickChip(el) {
 async function startTimerFromItem(item, deviceOverride) {
   const device = deviceOverride || CFG.device;
   const timer = { id: genId(), item_id: item.id, title: item.title,
-    category: item.category, location: item.location, device, tags: item.tags,
+    category: item.category, location: item.location, device,
     start_time: new Date().toISOString() };
   try {
     await sheetsAppend(SHEETS.active, [[
       timer.id, timer.item_id, timer.title, timer.category,
-      timer.location, timer.device, timer.tags, timer.start_time
+      timer.location, timer.device, timer.start_time
     ]]);
     STATE.activeTimers.push(timer);
     renderChecklist(); renderActiveTimers();
@@ -1901,7 +1807,6 @@ async function saveChecklistItem() {
     document.getElementById('cl-category').value.trim(),
     document.getElementById('cl-location').value.trim(),
     document.getElementById('cl-device').value.trim(),
-    document.getElementById('cl-tags').value.trim(),
     recurrence, days,
     document.getElementById('cl-emoji').value.trim() || '📌',
     itemType, goalMins];
@@ -1951,7 +1856,7 @@ async function stopTimer(timer) {
   const durationMins = ((new Date(endTime) - new Date(timer.start_time)) / 60000).toFixed(2);
   try {
     await sheetsAppend(SHEETS.log, [[genId(), timer.item_id, timer.title, timer.category,
-      timer.location, timer.device, timer.tags, timer.start_time, endTime, durationMins]]);
+      timer.location, timer.device, timer.start_time, endTime, durationMins]]);
     const allActive = await sheetsGetAll(SHEETS.active);
     const rowIdx = allActive.findIndex(r => r.id === timer.id);
     if (rowIdx >= 0) await sheetsDeleteRow(SHEETS.active, rowIdx);
@@ -2005,15 +1910,14 @@ async function startManualTimer() {
     category: document.getElementById('t-category').value.trim(),
     location: document.getElementById('t-location').value.trim(),
     device: STATE.selectedDevice || CFG.device,
-    tags: document.getElementById('t-tags').value.trim(),
     start_time: new Date().toISOString() };
   try {
     await sheetsAppend(SHEETS.active, [[timer.id, timer.item_id, timer.title, timer.category,
-      timer.location, timer.device, timer.tags, timer.start_time]]);
+      timer.location, timer.device, timer.start_time]]);
     STATE.activeTimers.push(timer);
     renderActiveTimers();
     showToast(`▶ Timer started!`);
-    ['t-title','t-category','t-location','t-tags'].forEach(id => document.getElementById(id).value = '');
+    ['t-title','t-category','t-location'].forEach(id => document.getElementById(id).value = '');
     switchView('checklist', document.querySelectorAll('.nav-item')[0]);
   } catch(e) { showToast('Error: ' + e.message); }
 }
@@ -2283,20 +2187,58 @@ function renderTasksChart(items) {
   });
 }
 
-// ── PRESETS ──
-// Presets are stored in localStorage (device-local, intentional — they're personal shortcuts)
-function loadPresets() {
-  try { return JSON.parse(localStorage.getItem('chronicle_presets') || '[]'); }
-  catch(e) { return []; }
+// ── PRESETS (synced via quick_starts sheet) ──
+async function loadPresets() {
+  try {
+    const rows = await sheetsGetAll(SHEETS.presets);
+    STATE.presets = rows;
+  } catch(e) {
+    STATE.presets = [];
+  }
+  renderPresets();
 }
-function savePresets(presets) {
-  localStorage.setItem('chronicle_presets', JSON.stringify(presets));
+
+async function savePreset() {
+  const title = document.getElementById('p-title').value.trim();
+  if (!title) { showToast('Please enter a title'); return; }
+  const preset = {
+    id: editingPresetId !== null ? STATE.presets[editingPresetId]?.id || genId() : genId(),
+    title,
+    category: document.getElementById('p-category').value.trim(),
+    location: document.getElementById('p-location').value.trim(),
+    emoji: document.getElementById('p-emoji').value.trim() || '⏱',
+  };
+  try {
+    setLoading(true);
+    if (editingPresetId !== null) {
+      // Update existing row
+      const all = await sheetsGetAll(SHEETS.presets);
+      const rowIdx = all.findIndex(r => r.id === preset.id);
+      if (rowIdx >= 0) {
+        await ensureToken();
+        const range = `${SHEETS.presets}!A${rowIdx + 2}:E${rowIdx + 2}`;
+        await fetch(`${BASE}/${CFG.sheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ACCESS_TOKEN}` },
+          body: JSON.stringify({ values: [[preset.id, preset.title, preset.category, preset.location, preset.emoji]] })
+        });
+      }
+      showToast('Preset updated!');
+    } else {
+      await sheetsAppend(SHEETS.presets, [[preset.id, preset.title, preset.category, preset.location, preset.emoji]]);
+      showToast('Quick start added!');
+    }
+    closeModal('modal-preset');
+    await loadPresets();
+  } catch(e) { showToast('Error: ' + e.message); }
+  setLoading(false);
+  editingPresetId = null;
 }
 
 let editingPresetId = null;
 
 function renderPresets() {
-  const presets = loadPresets();
+  const presets = STATE.presets || [];
   const container = document.getElementById('presets-list');
   if (!container) return;
   if (!presets.length) {
@@ -2318,63 +2260,43 @@ function renderPresets() {
 }
 
 function tapPreset(idx) {
-  const presets = loadPresets();
+  const presets = STATE.presets || [];
   const p = presets[idx];
   if (!p) return;
-  // If a timer is already running for this preset, stop it
   const active = STATE.activeTimers.find(t => t.title === p.title && !t.item_id);
   if (active) { stopTimer(active); return; }
-  // Otherwise fill the form and let user choose device / start
   document.getElementById('t-title').value = p.title;
   document.getElementById('t-category').value = p.category || '';
   document.getElementById('t-location').value = p.location || '';
-  document.getElementById('t-tags').value = p.tags || '';
-  // Scroll down to the form
   document.getElementById('view-timer').querySelector('.start-timer-btn').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   showToast(`"${p.title}" loaded — pick a device and start!`);
 }
 
-function deletePreset(e, idx) {
+async function deletePreset(e, idx) {
   e.stopPropagation();
-  const presets = loadPresets();
-  if (!confirm(`Remove "${presets[idx]?.title}" from Quick Start?`)) return;
-  presets.splice(idx, 1);
-  savePresets(presets);
-  renderPresets();
+  const presets = STATE.presets || [];
+  const p = presets[idx];
+  if (!p || !confirm(`Remove "${p.title}" from Quick Start?`)) return;
+  try {
+    setLoading(true);
+    const all = await sheetsGetAll(SHEETS.presets);
+    const rowIdx = all.findIndex(r => r.id === p.id);
+    if (rowIdx >= 0) await sheetsDeleteRow(SHEETS.presets, rowIdx);
+    await loadPresets();
+  } catch(e) { showToast('Error: ' + e.message); }
+  setLoading(false);
 }
 
 function openAddPresetModal(idx = null) {
   editingPresetId = idx;
-  const presets = loadPresets();
+  const presets = STATE.presets || [];
   const p = idx !== null ? presets[idx] : null;
   document.getElementById('preset-modal-title').textContent = p ? 'Edit Quick Start' : 'Add Quick Start';
   document.getElementById('p-title').value = p?.title || '';
   document.getElementById('p-category').value = p?.category || '';
   document.getElementById('p-location').value = p?.location || '';
-  document.getElementById('p-tags').value = p?.tags || '';
   document.getElementById('p-emoji').value = p?.emoji || '';
   document.getElementById('modal-preset').classList.add('open');
-}
-
-function savePreset() {
-  const title = document.getElementById('p-title').value.trim();
-  if (!title) { showToast('Please enter a title'); return; }
-  const preset = {
-    id: genId(),
-    title,
-    category: document.getElementById('p-category').value.trim(),
-    location: document.getElementById('p-location').value.trim(),
-    tags: document.getElementById('p-tags').value.trim(),
-    emoji: document.getElementById('p-emoji').value.trim() || '⏱',
-  };
-  const presets = loadPresets();
-  if (editingPresetId !== null) presets[editingPresetId] = preset;
-  else presets.push(preset);
-  savePresets(presets);
-  closeModal('modal-preset');
-  renderPresets();
-  showToast(editingPresetId !== null ? 'Preset updated!' : 'Quick start added!');
-  editingPresetId = null;
 }
 
 // ── RESETS ──
@@ -2399,7 +2321,7 @@ function switchView(name, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
   el.classList.add('active');
-  if (name === 'timer') { renderDeviceChips(); renderPresets(); }
+  if (name === 'timer') { renderDeviceChips(); loadPresets(); }
 }
 function openAddChecklistModal() { openAddChecklistModalFor('daily'); }
 function openAddChecklistModalFor(type) {
@@ -2500,14 +2422,6 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
         <input class="combobox-input" id="p-location" placeholder="Home" autocomplete="off" oninput="filterCombo('p-location','p-loc-drop')" onfocus="openCombo('p-loc-drop')" onblur="closeComboDelayed('p-loc-drop')">
         <span class="combobox-arrow">▾</span>
         <div class="combobox-dropdown" id="p-loc-drop"></div>
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Tags</label>
-      <div class="combobox-wrap">
-        <input class="combobox-input" id="p-tags" placeholder="gaming, relaxing" autocomplete="off" oninput="filterCombo('p-tags','p-tag-drop')" onfocus="openCombo('p-tag-drop')" onblur="closeComboDelayed('p-tag-drop')">
-        <span class="combobox-arrow">▾</span>
-        <div class="combobox-dropdown" id="p-tag-drop"></div>
       </div>
     </div>
     <div class="form-actions">
