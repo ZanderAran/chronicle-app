@@ -843,6 +843,42 @@
     width: 100%;
     margin-top: 0.5rem;
   }
+
+  /* ── SPLASH SCREEN ── */
+  #splash-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100dvh;
+    gap: 1.5rem;
+    background: var(--bg);
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+  }
+  #splash-screen.hidden { display: none; }
+  .splash-logo {
+    font-family: var(--mono);
+    font-size: 2.5rem;
+    font-weight: 500;
+    letter-spacing: -0.05em;
+    color: var(--text);
+  }
+  .splash-logo span { color: var(--accent); }
+  .splash-spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .splash-status {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
 </style>
 </head>
 <body>
@@ -850,8 +886,15 @@
 <div class="loading-bar" id="loading-bar"></div>
 <div id="toast"></div>
 
-<!-- AUTH SCREEN -->
-<div id="auth-screen">
+<!-- SPLASH SCREEN (shown while silent auth is in progress) -->
+<div id="splash-screen">
+  <div class="splash-logo">chron<span>.</span>icle</div>
+  <div class="splash-spinner"></div>
+  <div class="splash-status" id="splash-status">Connecting…</div>
+</div>
+
+<!-- AUTH SCREEN (only shown for first-time setup or when token truly expires) -->
+<div id="auth-screen" style="display:none">
   <div>
     <div class="auth-logo">chron<span>.</span>icle</div>
   </div>
@@ -1086,40 +1129,6 @@
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-title">Add Checklist Item</div>
-
-    <!-- Recurring / One-time toggle -->
-    <div class="form-group">
-      <label class="form-label">Schedule</label>
-      <div class="toggle-tabs" style="margin-bottom:0">
-        <div class="toggle-tab active" id="tab-recurring" onclick="setScheduleType('recurring')">🔁 Recurring</div>
-        <div class="toggle-tab" id="tab-onetime" onclick="setScheduleType('onetime')">1️⃣ One-time</div>
-      </div>
-      <input type="hidden" id="cl-item-type" value="recurring">
-    </div>
-
-    <!-- Recurrence options (only shown for recurring) -->
-    <div id="recurrence-group">
-      <div class="form-group">
-        <label class="form-label">Recurrence</label>
-        <select class="form-select" id="cl-recurrence" onchange="toggleDaysPicker()">
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-        </select>
-      </div>
-      <div class="form-group" id="days-picker-group" style="display:none">
-        <label class="form-label">Repeat on</label>
-        <div class="days-picker" id="days-picker">
-          <button class="day-btn" data-day="Mon" onclick="toggleDay(this)">M</button>
-          <button class="day-btn" data-day="Tue" onclick="toggleDay(this)">T</button>
-          <button class="day-btn" data-day="Wed" onclick="toggleDay(this)">W</button>
-          <button class="day-btn" data-day="Thu" onclick="toggleDay(this)">T</button>
-          <button class="day-btn" data-day="Fri" onclick="toggleDay(this)">F</button>
-          <button class="day-btn" data-day="Sat" onclick="toggleDay(this)">S</button>
-          <button class="day-btn" data-day="Sun" onclick="toggleDay(this)">S</button>
-        </div>
-      </div>
-    </div>
-
     <div class="form-group">
       <label class="form-label">Title</label>
       <input class="form-input" id="cl-title" placeholder="Task name">
@@ -1164,24 +1173,38 @@
         <div class="combobox-dropdown" id="cl-tag-drop"></div>
       </div>
     </div>
-
-    <!-- Goal toggle — works for both recurring and one-time -->
     <div class="form-group">
-      <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:0.75rem 1rem;cursor:pointer" onclick="toggleGoal()">
-        <div style="display:flex;align-items:center;gap:0.6rem">
-          <span>🎯</span>
-          <span style="font-size:0.9rem;font-weight:500">Has a time goal</span>
-        </div>
-        <div id="goal-toggle-indicator" style="width:36px;height:20px;border-radius:10px;background:var(--border);transition:background 0.2s;position:relative;flex-shrink:0">
-          <div id="goal-toggle-knob" style="width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s"></div>
-        </div>
+      <label class="form-label">Recurrence</label>
+      <select class="form-select" id="cl-recurrence" onchange="toggleDaysPicker()">
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </div>
+    <div class="form-group" id="days-picker-group" style="display:none">
+      <label class="form-label">Repeat on</label>
+      <div class="days-picker" id="days-picker">
+        <button class="day-btn" data-day="Mon" onclick="toggleDay(this)">M</button>
+        <button class="day-btn" data-day="Tue" onclick="toggleDay(this)">T</button>
+        <button class="day-btn" data-day="Wed" onclick="toggleDay(this)">W</button>
+        <button class="day-btn" data-day="Thu" onclick="toggleDay(this)">T</button>
+        <button class="day-btn" data-day="Fri" onclick="toggleDay(this)">F</button>
+        <button class="day-btn" data-day="Sat" onclick="toggleDay(this)">S</button>
+        <button class="day-btn" data-day="Sun" onclick="toggleDay(this)">S</button>
       </div>
     </div>
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <div style="display:flex;gap:0.5rem">
+        <div class="toggle-type-btn active" id="type-btn-recurring" onclick="setItemType('recurring')">🔁 Recurring</div>
+        <div class="toggle-type-btn" id="type-btn-onetime" onclick="setItemType('onetime')">1️⃣ One-time</div>
+        <div class="toggle-type-btn" id="type-btn-goal" onclick="setItemType('goal')">🎯 Goal</div>
+      </div>
+      <input type="hidden" id="cl-item-type" value="recurring">
+    </div>
     <div class="form-group" id="goal-mins-group" style="display:none">
-      <label class="form-label">Minimum minutes</label>
+      <label class="form-label">Goal — minimum minutes</label>
       <input class="form-input" id="cl-goal-mins" type="number" min="1" placeholder="e.g. 20">
     </div>
-
     <div class="form-actions">
       <button class="btn-secondary" onclick="closeModal('modal-checklist')">Cancel</button>
       <button class="btn-primary" onclick="saveChecklistItem()">Add Item</button>
@@ -1299,9 +1322,23 @@ window.addEventListener('DOMContentLoaded', () => {
     if (CFG.sheetId) document.getElementById('cfg-sheet-id').value = CFG.sheetId;
     document.getElementById('cfg-device').value = CFG.device;
   }
+  // If no saved config, skip splash and go straight to setup
+  if (!saved || !CFG.sheetId) {
+    hideSplash();
+    document.getElementById('auth-screen').style.display = 'flex';
+  }
+  setSplashStatus('Loading…');
   const waitForGIS = setInterval(() => {
     if (window.google && window.google.accounts) { clearInterval(waitForGIS); initGoogleAuth(); }
   }, 200);
+  // If GIS script never loads (e.g. offline), fall back after 12s
+  setTimeout(() => {
+    if (!window.google) {
+      hideSplash();
+      document.getElementById('auth-screen').style.display = 'flex';
+      document.getElementById('auth-status').textContent = 'Could not connect — check your internet and reload.';
+    }
+  }, 12000);
 });
 
 function detectDevice() {
@@ -1315,47 +1352,62 @@ function detectDevice() {
 
 function initGoogleAuth() {
   if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE') {
+    hideSplash();
+    document.getElementById('auth-screen').style.display = 'flex';
     document.getElementById('auth-status').innerHTML = '⚠️ Replace the placeholder Client ID in the file.';
     return;
   }
 
-  const hasSavedConfig = !!localStorage.getItem('chronicle_cfg');
+  const hasSavedConfig = !!(localStorage.getItem('chronicle_cfg') && CFG.sheetId);
 
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/spreadsheets',
     callback: (resp) => {
       if (resp.error) {
-        // Silent re-auth failed, fall back to showing the login button
+        // Silent re-auth failed — show login screen
+        hideSplash();
         document.getElementById('auth-screen').style.display = 'flex';
+        showSignInButton();
         document.getElementById('auth-status').textContent = 'Session expired — please sign in again.';
         return;
       }
       ACCESS_TOKEN = resp.access_token;
       TOKEN_EXPIRY = Date.now() + (resp.expires_in * 1000) - 60000;
-      if (document.getElementById('app').classList.contains('visible')) return; // already in app
+      if (document.getElementById('app').classList.contains('visible')) return;
+      hideSplash();
       startApp();
     },
   });
 
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: () => {} });
 
-  if (hasSavedConfig && CFG.sheetId) {
-    // Try to silently get a token without showing any UI
-    document.getElementById('auth-screen').style.display = 'none';
-    document.getElementById('auth-status').textContent = 'Reconnecting...';
+  if (hasSavedConfig) {
+    // Stay on splash, attempt silent token — no UI flicker
+    setSplashStatus('Signing in…');
     tokenClient.requestAccessToken({ prompt: '' });
-    // If silent auth fails after 5s, show the login screen
+    // Give Google up to 15s on slow mobile connections before falling back
     setTimeout(() => {
       if (!ACCESS_TOKEN) {
+        hideSplash();
         document.getElementById('auth-screen').style.display = 'flex';
         showSignInButton();
         document.getElementById('auth-status').textContent = 'Session expired — please sign in again.';
       }
-    }, 5000);
+    }, 15000);
   } else {
+    // First time — go straight to setup screen
+    hideSplash();
+    document.getElementById('auth-screen').style.display = 'flex';
     showSignInButton();
   }
+}
+
+function hideSplash() {
+  document.getElementById('splash-screen').classList.add('hidden');
+}
+function setSplashStatus(msg) {
+  document.getElementById('splash-status').textContent = msg;
 }
 
 function showSignInButton() {
@@ -1370,7 +1422,7 @@ function requestToken() {
   if (!sheetId) { showToast('Please paste your Sheet ID first'); return; }
   CFG = { sheetId, device };
   localStorage.setItem('chronicle_cfg', JSON.stringify(CFG));
-  tokenClient.requestAccessToken({ prompt: 'consent' });
+  tokenClient.requestAccessToken({ prompt: 'select_account' });
 }
 
 function handleTokenResponse(resp) {
@@ -1576,7 +1628,6 @@ function renderChecklist() {
   const list = document.getElementById('checklist-list');
   const dailyItems = STATE.checklistItems.filter(i => i.recurrence === 'daily');
   const weeklyItems = STATE.checklistItems.filter(i => i.recurrence === 'weekly');
-  const onetimeItems = STATE.checklistItems.filter(i => i.recurrence === 'onetime' || i.item_type === 'onetime');
 
   // Running timers section (all active, regardless of recurrence)
   const runningHtml = renderChecklistSection(
@@ -1601,14 +1652,7 @@ function renderChecklist() {
     'weekly'
   );
 
-  const onetimeHtml = onetimeItems.length ? renderChecklistSection(
-    onetimeItems.filter(i => STATE.activeTimers.find(t => t.item_id === i.id)).map(i => ({ item: i, active: STATE.activeTimers.find(t => t.item_id === i.id) })),
-    onetimeItems.filter(i => !STATE.activeTimers.find(t => t.item_id === i.id) && !STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
-    onetimeItems.filter(i => STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
-    'onetime'
-  ) : '';
-
-  list.innerHTML = runningHtml + dailyHtml + weeklyHtml + onetimeHtml;
+  list.innerHTML = runningHtml + dailyHtml + weeklyHtml;
 }
 
 function renderChecklistSection(inProgress, pending, done, type) {
@@ -1623,7 +1667,7 @@ function renderChecklistSection(inProgress, pending, done, type) {
       </div>${items}</div>`;
   }
 
-  const label = type === 'daily' ? '📅 Daily' : type === 'weekly' ? '📆 Weekly' : '1️⃣ One-time';
+  const label = type === 'daily' ? '📅 Daily' : '📆 Weekly';
   const allEmpty = !inProgress.length && !pending.length && !done.length;
 
   let items = '';
@@ -1638,6 +1682,7 @@ function renderChecklistSection(inProgress, pending, done, type) {
   return `<div class="checklist-section">
     <div class="checklist-section-header">
       <div class="checklist-section-title ${type}">${label}</div>
+      <button class="section-add-btn" onclick="openAddChecklistModalFor('${type}')">＋</button>
     </div>${items}</div>`;
 }
 
@@ -1733,28 +1778,16 @@ function openEditChecklistModal(itemId) {
   document.getElementById('cl-device').value = item.device || '';
   document.getElementById('cl-tags').value = item.tags || '';
   document.getElementById('cl-emoji').value = item.emoji || '';
-
-  const itemType = item.item_type || 'recurring';
-  const isOnetime = item.recurrence === 'onetime' || itemType === 'onetime';
-  setScheduleType(isOnetime ? 'onetime' : 'recurring');
-
-  if (!isOnetime) {
-    document.getElementById('cl-recurrence').value = item.recurrence || 'daily';
-    toggleDaysPicker();
-    if (item.days) {
-      item.days.split(',').forEach(day => {
-        const btn = document.querySelector(`.day-btn[data-day="${day.trim()}"]`);
-        if (btn) btn.classList.add('selected');
-      });
-    }
+  document.getElementById('cl-recurrence').value = item.recurrence || 'daily';
+  document.getElementById('cl-goal-mins').value = item.goal_mins || '';
+  setItemType(item.item_type || 'recurring');
+  toggleDaysPicker();
+  if (item.days) {
+    item.days.split(',').forEach(day => {
+      const btn = document.querySelector(`.day-btn[data-day="${day.trim()}"]`);
+      if (btn) btn.classList.add('selected');
+    });
   }
-
-  // Goal toggle
-  const isGoal = itemType === 'goal';
-  if (isGoal && !goalEnabled) toggleGoal();
-  else if (!isGoal && goalEnabled) toggleGoal();
-  if (isGoal) document.getElementById('cl-goal-mins').value = item.goal_mins || '';
-
   const saveBtn = document.querySelector('#modal-checklist .btn-primary');
   saveBtn.textContent = 'Save Changes';
   saveBtn.onclick = () => updateChecklistItem(itemId);
@@ -1764,12 +1797,11 @@ function openEditChecklistModal(itemId) {
 async function updateChecklistItem(itemId) {
   const title = document.getElementById('cl-title').value.trim();
   if (!title) { showToast('Please enter a title'); return; }
-  const scheduleType = document.getElementById('cl-item-type').value;
-  const recurrence = scheduleType === 'recurring' ? document.getElementById('cl-recurrence').value : 'onetime';
+  const recurrence = document.getElementById('cl-recurrence').value;
   const days = recurrence === 'weekly'
     ? Array.from(document.querySelectorAll('.day-btn.selected')).map(b => b.dataset.day).join(',') : '';
-  const itemType = goalEnabled ? 'goal' : scheduleType;
-  const goalMins = goalEnabled ? (document.getElementById('cl-goal-mins').value.trim() || '') : '';
+  const itemType = document.getElementById('cl-item-type').value;
+  const goalMins = itemType === 'goal' ? (document.getElementById('cl-goal-mins').value.trim() || '') : '';
   const updated = [
     itemId, title,
     document.getElementById('cl-category').value.trim(),
@@ -1860,13 +1892,11 @@ async function startTimerFromItem(item, deviceOverride) {
 async function saveChecklistItem() {
   const title = document.getElementById('cl-title').value.trim();
   if (!title) { showToast('Please enter a title'); return; }
-  const scheduleType = document.getElementById('cl-item-type').value; // recurring | onetime
-  const recurrence = scheduleType === 'recurring' ? document.getElementById('cl-recurrence').value : 'onetime';
+  const recurrence = document.getElementById('cl-recurrence').value;
   const days = recurrence === 'weekly'
     ? Array.from(document.querySelectorAll('.day-btn.selected')).map(b => b.dataset.day).join(',') : '';
-  // item_type: if goal toggle is on, store 'goal', else use schedule type
-  const itemType = goalEnabled ? 'goal' : scheduleType;
-  const goalMins = goalEnabled ? (document.getElementById('cl-goal-mins').value.trim() || '') : '';
+  const itemType = document.getElementById('cl-item-type').value; // recurring | onetime | goal
+  const goalMins = itemType === 'goal' ? (document.getElementById('cl-goal-mins').value.trim() || '') : '';
   const item = [genId(), title,
     document.getElementById('cl-category').value.trim(),
     document.getElementById('cl-location').value.trim(),
@@ -2374,16 +2404,8 @@ function switchView(name, el) {
 function openAddChecklistModal() { openAddChecklistModalFor('daily'); }
 function openAddChecklistModalFor(type) {
   document.getElementById('modal-checklist').classList.add('open');
-  // 'daily' and 'weekly' both map to recurring schedule type
-  setScheduleType('recurring');
-  if (type === 'weekly') {
-    document.getElementById('cl-recurrence').value = 'weekly';
-    toggleDaysPicker();
-  } else {
-    document.getElementById('cl-recurrence').value = 'daily';
-    toggleDaysPicker();
-  }
-  if (goalEnabled) toggleGoal(); // reset goal if open
+  document.getElementById('cl-recurrence').value = type || 'daily';
+  toggleDaysPicker();
 }
 function closeModal(id) {
   document.getElementById(id).classList.remove('open');
@@ -2395,10 +2417,7 @@ function closeModal(id) {
       saveBtn.onclick = saveChecklistItem;
       document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('selected'));
     }
-    // Reset schedule toggle to recurring
-    setScheduleType('recurring');
-    // Reset goal toggle if on
-    if (goalEnabled) toggleGoal();
+    setItemType('recurring');
   }
 }
 function showSetupGuide() { document.getElementById('modal-guide').classList.add('open'); }
@@ -2406,38 +2425,12 @@ function toggleDaysPicker() {
   document.getElementById('days-picker-group').style.display =
     document.getElementById('cl-recurrence').value === 'weekly' ? 'block' : 'none';
 }
-function setScheduleType(type) {
-  document.getElementById('cl-item-type').value = type;
-  document.getElementById('tab-recurring').classList.toggle('active', type === 'recurring');
-  document.getElementById('tab-onetime').classList.toggle('active', type === 'onetime');
-  document.getElementById('recurrence-group').style.display = type === 'recurring' ? 'block' : 'none';
-  // Reset recurrence to daily when switching to recurring
-  if (type === 'recurring') {
-    document.getElementById('cl-recurrence').value = 'daily';
-    toggleDaysPicker();
-  }
-}
-let goalEnabled = false;
-function toggleGoal() {
-  goalEnabled = !goalEnabled;
-  const indicator = document.getElementById('goal-toggle-indicator');
-  const knob = document.getElementById('goal-toggle-knob');
-  indicator.style.background = goalEnabled ? 'var(--accent)' : 'var(--border)';
-  knob.style.left = goalEnabled ? '18px' : '2px';
-  document.getElementById('goal-mins-group').style.display = goalEnabled ? 'block' : 'none';
-}
 function setItemType(type) {
-  // Legacy shim for edit modal compatibility
   document.getElementById('cl-item-type').value = type;
-  if (type === 'goal') {
-    // treat as recurring + goal enabled
-    setScheduleType('recurring');
-    if (!goalEnabled) toggleGoal();
-  } else {
-    setScheduleType(type);
-    if (goalEnabled) toggleGoal();
-  }
-  document.getElementById('goal-mins-group').style.display = (type === 'goal' || goalEnabled) ? 'block' : 'none';
+  ['recurring','onetime','goal'].forEach(t => {
+    document.getElementById(`type-btn-${t}`)?.classList.toggle('active', t === type);
+  });
+  document.getElementById('goal-mins-group').style.display = type === 'goal' ? 'block' : 'none';
 }
 function toggleDay(btn) { btn.classList.toggle('selected'); }
 function setLoading(on) {
