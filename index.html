@@ -1547,8 +1547,12 @@ async function loadChecklist() {
 
 function renderChecklist() {
   const list = document.getElementById('checklist-list');
-  const dailyItems = STATE.checklistItems.filter(i => i.recurrence === 'daily');
+  const dailyItems  = STATE.checklistItems.filter(i => i.recurrence === 'daily');
   const weeklyItems = STATE.checklistItems.filter(i => i.recurrence === 'weekly');
+  const onetimeItems = STATE.checklistItems.filter(i =>
+    i.recurrence === 'onetime' || i.item_type === 'onetime');
+
+  const activeFor = (item) => STATE.activeTimers.find(t => t.item_id === item.id);
 
   // Running timers section (all active, regardless of recurrence)
   const runningHtml = renderChecklistSection(
@@ -1560,20 +1564,27 @@ function renderChecklist() {
   );
 
   const dailyHtml = renderChecklistSection(
-    dailyItems.filter(i => STATE.activeTimers.find(t => t.item_id === i.id)).map(i => ({ item: i, active: STATE.activeTimers.find(t => t.item_id === i.id) })),
-    dailyItems.filter(i => !STATE.activeTimers.find(t => t.item_id === i.id) && !STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
+    dailyItems.filter(i => activeFor(i)).map(i => ({ item: i, active: activeFor(i) })),
+    dailyItems.filter(i => !activeFor(i) && !STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
     dailyItems.filter(i => STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
     'daily'
   );
 
   const weeklyHtml = renderChecklistSection(
-    weeklyItems.filter(i => STATE.activeTimers.find(t => t.item_id === i.id)).map(i => ({ item: i, active: STATE.activeTimers.find(t => t.item_id === i.id) })),
-    weeklyItems.filter(i => !STATE.activeTimers.find(t => t.item_id === i.id) && !STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
+    weeklyItems.filter(i => activeFor(i)).map(i => ({ item: i, active: activeFor(i) })),
+    weeklyItems.filter(i => !activeFor(i) && !STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
     weeklyItems.filter(i => STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
     'weekly'
   );
 
-  list.innerHTML = runningHtml + dailyHtml + weeklyHtml;
+  const onetimeHtml = onetimeItems.length ? renderChecklistSection(
+    onetimeItems.filter(i => activeFor(i)).map(i => ({ item: i, active: activeFor(i) })),
+    onetimeItems.filter(i => !activeFor(i) && !STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
+    onetimeItems.filter(i => STATE.doneTodayIds.has(i.id)).map(i => ({ item: i })),
+    'onetime'
+  ) : '';
+
+  list.innerHTML = runningHtml + dailyHtml + weeklyHtml + onetimeHtml;
 }
 
 function renderChecklistSection(inProgress, pending, done, type) {
@@ -1588,7 +1599,7 @@ function renderChecklistSection(inProgress, pending, done, type) {
       </div>${items}</div>`;
   }
 
-  const label = type === 'daily' ? '📅 Daily' : '📆 Weekly';
+  const label = type === 'daily' ? '📅 Daily' : type === 'weekly' ? '📆 Weekly' : '1️⃣ One-time';
   const allEmpty = !inProgress.length && !pending.length && !done.length;
 
   let items = '';
