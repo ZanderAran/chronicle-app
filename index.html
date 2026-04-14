@@ -1291,6 +1291,11 @@ function detectDevice() {
   return 'Browser';
 }
 
+function isPWA() {
+  return window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+}
+
 function initGoogleAuth() {
   if (GOOGLE_CLIENT_ID === 'YOUR_GOOGLE_OAUTH_CLIENT_ID_HERE') {
     document.getElementById('auth-status').innerHTML = '⚠️ Replace the placeholder Client ID in the file.';
@@ -1298,15 +1303,19 @@ function initGoogleAuth() {
   }
 
   const hasSavedConfig = !!localStorage.getItem('chronicle_cfg');
+  // On iOS PWA, silent OAuth always fails (no shared cookie jar with Safari).
+  // Skip the silent attempt entirely and go straight to the one-tap button.
+  const canSilentAuth = hasSavedConfig && CFG.sheetId && !isPWA();
 
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/spreadsheets',
     callback: (resp) => {
       if (resp.error) {
-        // Silent re-auth failed, fall back to showing the login button
+        // Silent re-auth failed — show the button immediately, no timeout needed
         document.getElementById('auth-screen').style.display = 'flex';
-        document.getElementById('auth-status').textContent = 'Session expired — please sign in again.';
+        showSignInButton();
+        document.getElementById('auth-status').textContent = 'Tap below to reconnect.';
         return;
       }
       ACCESS_TOKEN = resp.access_token;
@@ -1318,19 +1327,14 @@ function initGoogleAuth() {
 
   google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: () => {} });
 
-  if (hasSavedConfig && CFG.sheetId) {
-    // Try to silently get a token without showing any UI
+  if (canSilentAuth) {
+    // Desktop: try silent token refresh (usually works via browser session cookie)
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('auth-status').textContent = 'Reconnecting...';
     tokenClient.requestAccessToken({ prompt: '' });
-    // If silent auth fails after 5s, show the login screen
-    setTimeout(() => {
-      if (!ACCESS_TOKEN) {
-        document.getElementById('auth-screen').style.display = 'flex';
-        showSignInButton();
-        document.getElementById('auth-status').textContent = 'Session expired — please sign in again.';
-      }
-    }, 5000);
+  } else if (hasSavedConfig && CFG.sheetId) {
+    // iOS PWA (or silent auth not possible): show one-tap reconnect button immediately
+    showSignInButton();
   } else {
     showSignInButton();
   }
@@ -1346,9 +1350,12 @@ function requestToken() {
   const sheetId = document.getElementById('cfg-sheet-id').value.trim();
   const device = document.getElementById('cfg-device').value.trim() || detectDevice();
   if (!sheetId) { showToast('Please paste your Sheet ID first'); return; }
+  const isReconnect = CFG.sheetId === sheetId; // same sheet — just needs a fresh token
   CFG = { sheetId, device };
   localStorage.setItem('chronicle_cfg', JSON.stringify(CFG));
-  tokenClient.requestAccessToken({ prompt: 'select_account' });
+  // On reconnect (same sheet, same account) skip the account picker for less friction.
+  // On first setup, show account picker so they can choose the right Google account.
+  tokenClient.requestAccessToken({ prompt: isReconnect ? '' : 'select_account' });
 }
 
 function handleTokenResponse(resp) {
@@ -1672,7 +1679,13 @@ function renderChecklistItemDone(item) {
     <div class="item-body"><div class="item-title">${item.title}</div><div class="item-tags">${[item.category,item.location].filter(Boolean).join(' · ')}</div></div></div>`;
 }
 
+let _checklistTapping = false;
 async function handleChecklistTap(itemId) {
+  if (longPressFired) { longPressFired = false; return; } // long press already handled this touch
+  if (_checklistTapping) return;
+  _checklistTapping = true;
+  setTimeout(() => { _checklistTapping = false; }, 600);
+
   const item = STATE.checklistItems.find(i => i.id === itemId);
   if (!item) return;
   const active = STATE.activeTimers.find(t => t.item_id === itemId);
@@ -1683,9 +1696,11 @@ async function handleChecklistTap(itemId) {
 
 // ── LONG PRESS / CONTEXT MENU ──
 let longPressTimer = null;
+let longPressFired = false;
 function startLongPress(itemId) {
   cancelLongPress();
-  longPressTimer = setTimeout(() => { openItemMenu(null, itemId); }, 500);
+  longPressFired = false;
+  longPressTimer = setTimeout(() => { longPressFired = true; openItemMenu(null, itemId); }, 500);
 }
 function cancelLongPress() {
   if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
@@ -1888,7 +1903,17 @@ function renderActiveTimers() {
   if (document.getElementById('view-checklist').classList.contains('active')) renderChecklist();
 }
 
-async function stopTimerById(id) { const t = STATE.activeTimers.find(t => t.id === id); if (t) await stopTimer(t); }
+const _pendingStop = new Set();
+async function stopTimerById(id) {
+  if (_pendingStop.has(id)) return; // already processing, ignore extra taps
+  _pendingStop.add(id);
+  try {
+    const t = STATE.activeTimers.find(t => t.id === id);
+    if (t) await stopTimer(t);
+  } finally {
+    _pendingStop.delete(id);
+  }
+}
 
 async function stopTimer(timer) {
   const endTime = new Date().toISOString();
@@ -2298,16 +2323,23 @@ function renderPresets() {
   }).join('')}</div>`;
 }
 
+let _presetTapping = false;
 function tapPreset(idx) {
+  if (_presetTapping) return;
+  _presetTapping = true;
+  setTimeout(() => { _presetTapping = false; }, 500);
+
   const presets = STATE.presets || [];
   const p = presets[idx];
   if (!p) return;
   const active = STATE.activeTimers.find(t => t.title === p.title && !t.item_id);
   if (active) { stopTimer(active); return; }
+  // Switch to timer view so the autofilled form is visible
+  const timerNavItem = document.querySelector('.nav-item[onclick*="timer"]');
+  if (timerNavItem) switchView('timer', timerNavItem);
   document.getElementById('t-title').value = p.title;
   document.getElementById('t-category').value = p.category || '';
   document.getElementById('t-location').value = p.location || '';
-  document.getElementById('view-timer').querySelector('.start-timer-btn').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   showToast(`"${p.title}" loaded — pick a device and start!`);
 }
 
